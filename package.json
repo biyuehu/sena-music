@@ -1,0 +1,52 @@
+{
+  "name": "ts-playground",
+  "description": "",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0",
+  "author": "Romi <me@hotaru.icu>",
+  "scripts": {
+    "dev:server": "tsx watch src/server/app.ts",
+    "dev:client": "parcel watch src/web/views/** --watch-dir src",
+    "dev": "concurrently -n server,client -c blue,red,green \"pnpm dev:server\" \"pnpm dev:client\"",
+    "build": "parcel build src/web/views/**"
+  },
+  "dependencies": {
+    "@kotori-bot/i18n": "^1.3.3",
+    "@kotori-bot/logger": "^1.3.4",
+    "@kotori-bot/tools": "^1.5.2",
+    "cross-env": "^10.1.0",
+    "devalue": "^5.6.4",
+    "dotenv": "^17.3.1",
+    "dotenv-cli": "^11.0.0",
+    "fluoro": "^1.1.2",
+    "fp-ts": "^2.16.11",
+    "kysely": "^0.28.11",
+    "lit-html": "^3.3.2",
+    "sirv": "^3.0.2",
+    "usignal": "^0.10.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@parcel/config-default": "^2.16.4",
+    "@parcel/transformer-css": "^2.16.4",
+    "@parcel/transformer-postcss": "^2.16.4",
+    "@types/node": "^25.3.5",
+    "@unocss/postcss": "^66.6.7",
+    "concurrently": "^9.2.1",
+    "conventional-changelog-cli": "^4.1.0",
+    "parcel": "^2.16.4",
+    "postcss": "^8.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "5.5.3",
+    "unocss": "^66.6.7"
+  },
+  "targets": {
+    "default": {
+      "context": "browser",
+      "optimize": true
+    }
+  }
+}

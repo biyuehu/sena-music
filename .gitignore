@@ -1,0 +1,5 @@
+node_modules
+dist
+.parcel-cache
+public
+src/web/views/uno.css

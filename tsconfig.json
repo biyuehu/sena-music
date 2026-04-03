@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/romi": [
+        "src/framework/core/index.ts"
+      ],
+      "@/romi/client": [
+        "src/framework/core/client.ts"
+      ],
+      "@/romi/utils/*": [
+        "src/framework/utils/*"
+      ],
+      "@/romi/web": [
+        "src/framework/web/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*.ts",
+    "script/**/*.ts"
+  ]
+}
