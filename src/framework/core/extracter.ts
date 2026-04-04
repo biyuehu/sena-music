@@ -10,10 +10,16 @@ export abstract class Extracter<Data> {
 
 export type InferExtracters<T extends Extracter<unknown>[]> = T extends [
   Extracter<infer Data>,
-  ...infer xs extends Extracter<unknown>[]
+  ...infer Xs extends Extracter<unknown>[]
 ]
-  ? [Data, ...InferExtracters<xs>]
+  ? [Data, ...InferExtracters<Xs>]
   : []
+
+// export class EmptyExtracter extends Extracter<unknown> {
+//   public override extract(_: IncomingMessage): Promise<Either<Error, unknown>> {
+//     return Promise.resolve(Right({}))
+//   }
+// }
 
 export class BodyExtracter<T extends z.ZodType> extends Extracter<z.infer<T>> {
   private declare readonly brand: 'BodyExtracter'
@@ -25,7 +31,7 @@ export class BodyExtracter<T extends z.ZodType> extends Extracter<z.infer<T>> {
     super()
   }
 
-  public extract(reqRaw: IncomingMessage): Promise<Either<Error, z.infer<T>>> {
+  public override extract(reqRaw: IncomingMessage): Promise<Either<Error, z.infer<T>>> {
     return new Promise((resolve) => {
       let data = ''
       const timer = setTimeout(() => {
@@ -60,7 +66,7 @@ export class QueryExtracter<T extends z.ZodType> extends Extracter<z.infer<T>> {
     super()
   }
 
-  public async extract(reqRaw: IncomingMessage): Promise<Either<Error, z.infer<T>>> {
+  public override async extract(reqRaw: IncomingMessage): Promise<Either<Error, z.infer<T>>> {
     try {
       return Right(this.schema.parse(Object.fromEntries(new URL(reqRaw.url ?? '', 'http://localhost').searchParams)))
     } catch (e) {

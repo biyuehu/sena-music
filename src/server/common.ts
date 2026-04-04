@@ -9,3 +9,16 @@ export const logger = new Logger({
   label: [],
   transports: new ConsoleTransport()
 })
+
+export const CONFIG = {
+  port: 3000,
+  db: {
+    host: 'localhost',
+    port: 5432,
+    user: 'user',
+    password: 'password',
+    database: 'database'
+  },
+  dataDirectory: 'data',
+  playlistId: 2653919517
+}

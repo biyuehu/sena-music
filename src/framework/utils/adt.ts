@@ -10,7 +10,7 @@ export abstract class Variant<B, T> {
   // }
 }
 
-type ADT<T extends Record<string, unknown>> = { [K in keyof T]: { value: T[K]; _type: K } }[keyof T]
+export type ADT<T extends Record<string, unknown>> = { [K in keyof T]: { value: T[K]; _type: K } }[keyof T]
 type Cases<T, R = unknown> = T extends ADT<infer _> ? { [K in T as K['_type']]: (v: K['value']) => R } : never
 
 export function match<A extends ADT<Known>, C extends Cases<A>>(adt: A, cases: C): ReturnType<C[keyof C]> {

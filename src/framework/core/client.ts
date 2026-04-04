@@ -60,8 +60,8 @@ export interface ClientOptions {
 export function createClient<R extends ClientRoute>(
   options: ClientOptions = { baseUrl: '' }
 ): InferClientRouteToFunction<R> {
-  const buildProxy = (segments: string[]): unknown => {
-    return new Proxy(() => {}, {
+  const buildProxy = (segments: string[]): unknown =>
+    new Proxy(() => {}, {
       get(_, key: string) {
         if (key === 'then') return void 0
         return buildProxy([...segments, key])
@@ -90,6 +90,5 @@ export function createClient<R extends ClientRoute>(
         }
       }
     })
-  }
   return buildProxy([]) as InferClientRouteToFunction<R>
 }

@@ -30,11 +30,13 @@ export const Ref = <T>(value: T): Ref<T> => new Ref_(value)
 
 export type AnyFields = Record<string, Prop | State | Ref>
 
-type InferFields<T extends AnyFields> = {
+export type InferFields<T extends AnyFields> = {
   [K in keyof T]: T[K] extends Prop<infer V> | State<infer V> | Ref<infer V> ? V : never
 }
 
 export type Host<T extends AnyFields> = InferFields<T> & HTMLElement
+
+export type ComponentConstructor<T extends AnyFields> = new () => Host<T>
 
 export type Definition<T extends AnyFields> = {
   useGlobalStyles?: boolean
@@ -102,7 +104,7 @@ function getGlobalSheet() {
 export function defineComponentFrom<T extends AnyFields>(
   fields: T,
   definition: Definition<T>
-): CustomElementConstructor {
+): ComponentConstructor<T> {
   const sheets = definition.styles ? buildSheets(definition.styles) : null
 
   type AnySignal = ReturnType<typeof signal<unknown>>
@@ -214,9 +216,15 @@ export function defineComponentFrom<T extends AnyFields>(
     }
   }
 
-  return El
+  return El as ComponentConstructor<T>
 }
 
-export function defineComponent<T extends AnyFields>(tag: string, fields: T, definition: Definition<T>): void {
-  customElements.define(tag, defineComponentFrom(fields, definition))
+export function defineComponent<T extends AnyFields>(
+  tag: string,
+  fields: T,
+  definition: Definition<T>
+): ComponentConstructor<T> {
+  const el = defineComponentFrom(fields, definition)
+  customElements.define(tag, el)
+  return el
 }

@@ -1,24 +1,41 @@
+import { playListSchema } from 'src/common/types'
 import z from 'zod'
-import { Action, Api, AssetsReturner, any, BodyExtracter, JsonRetutner, type RouteWith } from '@/romi'
-import { Right } from '@/romi/utils/adt/either'
-import { getUserHandler } from './actions'
+import { Action, Api, AssetsReturner, any, JsonRetutner, type RouteWith, standardJsonReturnErrorSchema } from '@/romi'
+import { addSongHandler, getPlaylistHandler, setSongOrderHandler, setSongSourceHandler, syncHandler } from './actions'
 import type { AppState } from './common'
 
-const getUser = Api.new(
-  getUserHandler,
-  z.object({ a: z.number() }),
-  z.object({ error: z.string() }),
+const getPlaylist = Api.new(
+  getPlaylistHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
   new JsonRetutner()
 )
 
-const addDecade = Api.new(
-  Action.empty<AppState>()
-    .use([new BodyExtracter(z.object({ date: z.date() }))] as const)
-    .bind(async ([body]) => {
-      return Right({ date: new Date(body.date.getFullYear() + 10, body.date.getMonth(), body.date.getDate()) })
-    }),
-  z.object({ date: z.date() }),
-  z.never(),
+const setSongSource = Api.new(
+  setSongSourceHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
+  new JsonRetutner()
+)
+
+const addSong = Api.new(
+  addSongHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
+  new JsonRetutner()
+)
+
+const setSongOrder = Api.new(
+  setSongOrderHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
+  new JsonRetutner()
+)
+
+const sync = Api.new(
+  syncHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
   new JsonRetutner()
 )
 
@@ -44,7 +61,10 @@ const assets = Api.new(
 )
 
 export const appRoute = {
-  getUser,
-  addDecade,
+  getPlaylist,
+  setSongSource,
+  addSong,
+  setSongOrder,
+  sync,
   [any]: assets
 } satisfies RouteWith<AppState>

@@ -1,12 +1,14 @@
 import { resolve } from 'node:path'
-import { defineConfig, presetWind3 } from 'unocss'
+import { extractorArbitraryVariants } from '@unocss/extractor-arbitrary-variants'
+import { defineConfig, presetIcons, presetWind3 } from 'unocss'
 
 export default defineConfig({
   cli: {
     entry: {
-      patterns: ['src/web/**/*.{html,ts}'],
+      patterns: ['**/*.{html,ts}', '**/music-player.ts'],
       outFile: resolve(__dirname, 'src/web/views/uno.css')
     }
   },
-  presets: [presetWind3()]
+  presets: [presetWind3(), presetIcons({ mode: 'bg' })],
+  extractors: [extractorArbitraryVariants()]
 })

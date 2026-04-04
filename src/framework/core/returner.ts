@@ -29,7 +29,7 @@ export class JsonRetutner<R extends [number, object] | object, L extends [number
   //   super()
   // }
 
-  public return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
+  public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
     resRaw.setHeader('Content-Type', 'application/json')
     result.match({
       Right: (result) => {
@@ -54,10 +54,14 @@ export class JsonRetutner<R extends [number, object] | object, L extends [number
   }
 }
 
+export const standardJsonReturnErrorSchema = z.object({
+  error: z.string()
+})
+
 export class TextReturner<R extends string, L extends string> extends Retutner<R, L> {
   protected declare readonly brand: 'TextReturner'
 
-  public return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
+  public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
     resRaw.setHeader('Content-Type', 'text/plain')
     result.match({
       Right: (result) => {
@@ -83,7 +87,7 @@ export class VirtualResourceReturner<
 > extends Retutner<R, L> {
   protected declare readonly brand: 'VirtualResourceReturner'
 
-  public return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
+  public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
     resRaw.setHeader('Content-Type', result.value.type)
     result.match({
       Right: (result) => {
@@ -120,14 +124,14 @@ export class AssetsReturner extends Retutner<object, never> {
     //   ...options
     // })
     this.handlers = dirs.map((dir) =>
-      sirv(resolve(dir), {
+      sirv(resolve(process.cwd(), dir), {
         dev: process.env.NODE_ENV !== 'production',
         ...options
       })
     )
   }
 
-  public return(_result: Either<never, object>, reqRaw: IncomingMessage, resRaw: ServerResponse): void {
+  public override return(_result: Either<never, object>, reqRaw: IncomingMessage, resRaw: ServerResponse): void {
     let i = 0
     const next = () => {
       if (i >= this.handlers.length) return this.fallback(reqRaw, resRaw)
