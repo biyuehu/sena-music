@@ -1,3 +1,4 @@
+import { createReadStream, existsSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { stringify } from 'devalue'
@@ -76,10 +77,18 @@ export class TextReturner<R extends string, L extends string> extends Retutner<R
   }
 }
 
-export const virtualResourceReturnSchema = z.object({
-  type: z.string(),
-  content: z.union([z.instanceof(Buffer), z.string()])
-})
+export const virtualResourceReturnSchema = z.union([
+  z.object({
+    type: z.string(),
+    content: z.union([z.instanceof(Buffer), z.string()])
+  }),
+  z.object({
+    type: z.string(),
+    path: z.string(),
+    code: z.number().optional(),
+    headers: z.record(z.string(), z.string()).optional()
+  })
+])
 
 export class VirtualResourceReturner<
   R extends z.infer<typeof virtualResourceReturnSchema>,
@@ -89,16 +98,37 @@ export class VirtualResourceReturner<
 
   public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
     resRaw.setHeader('Content-Type', result.value.type)
-    result.match({
+    const data = result.match({
       Right: (result) => {
         resRaw.statusCode = 200
-        resRaw.end(result.content)
+        return result
       },
       Left: (error) => {
         resRaw.statusCode = 400
-        resRaw.end(error.content)
+        return error
       }
     })
+
+    if ('content' in data) {
+      resRaw.end(data.content)
+      return
+    }
+
+    if (data.code) resRaw.statusCode = data.code
+
+    const path = resolve(process.cwd(), data.path)
+    if (!existsSync(path)) {
+      resRaw.statusCode = 404
+      resRaw.end()
+      return
+    }
+
+    resRaw.writeHead(data.code ?? 200, {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': statSync(path).size,
+      ...data.headers
+    })
+    createReadStream(path).pipe(resRaw)
   }
 }
 

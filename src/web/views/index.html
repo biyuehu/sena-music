@@ -5,14 +5,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lit + Parcel App</title>
-  <link rel="stylesheet" href="../styles/index.css">
   <link rel="stylesheet" href="../styles/uno.css">
+  <link rel="stylesheet" href="../styles/index.css">
 </head>
 
-<body class="m-0">
+<body>
   <toast-container></toast-container>
-  <music-player></music-player>
+  <div id="app" style="display:flex;height:100dvh;overflow:hidden;"
+    class="max-h-screen h-screen absolute top-0 right-0 bottom-0 left-0">
+    <side-nav></side-nav>
+    <music-player></music-player>
+  </div>
   <script type="module" src="../components/toast.ts"></script>
+  <script type="module" src="../components/side-nav.ts"></script>
   <script type="module" src="../components/music-player.ts"></script>
 </body>
 

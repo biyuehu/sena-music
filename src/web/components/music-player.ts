@@ -1,14 +1,14 @@
-import './side-nav'
 import './add-song-modal'
 import './edit-song-modal'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
 import type { Playlist, SongInfo } from 'src/common/types'
+import { PLAYLIST_SONG_ORDER_GAP } from 'src/server/constant'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
 import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
 import { httpClient } from '../client'
-import { formatTime } from '../utils'
+import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
 
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
@@ -26,6 +26,7 @@ interface PlayerActions {
   syncPlaylist: () => void
   openAddSongModal: () => void
   updateSongOrder: (id: string, newIndex: number) => void
+  removeSong: (id: string) => void
 }
 
 defineComponent(
@@ -40,6 +41,7 @@ defineComponent(
     progress: State<number>(0),
     currentTime: State<string>('00:00'),
     duration: State<string>('00:00'),
+    showVolumeBar: State(false),
     volume: State<number>(0.7),
     isFullscreen: State<boolean>(false),
     isSyncing: State<boolean>(false),
@@ -57,18 +59,30 @@ defineComponent(
   },
   {
     useGlobalStyles: true,
+    styles: /* css */ `
+        :host {
+    /* 必须让自定义标签本身在父级 flex 中占满剩余空间 */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* 防止子元素撑破容器 */
+    width: 100%;
+  }
+      `,
+
     connectedCallback: (host): (() => void) => {
       const loadPlaylist = (): void => {
         httpClient
           .getPlaylist()
           .then((playlist) =>
             playlist.match({
-              Right: ({ playlist: playlistData }) => {
-                host.playlist = playlistData
+              Right: ({ playlist }) => {
+                host.playlist = playlist
                 host.playlistError = Nothing()
               },
-              Left: () => {
-                host.playlistError = Just('加载播放列表失败')
+              Left: ({ error }) => {
+                console.error('Failed to load playlist:', error)
+                host.playlistError = Just(`加载播放列表失败：${error}`)
                 showToast('加载失败', 'error')
               }
             })
@@ -101,15 +115,14 @@ defineComponent(
 
       const actions: PlayerActions = {
         play: async (index: number): Promise<void> => {
+          host.showVolumeBar = false
           if (index < 0 || index >= host.playlist.length) return
           if (host.playErrorTimeout !== null) {
             clearTimeout(host.playErrorTimeout)
             host.playErrorTimeout = null
           }
           host.currentIndex = index
-          const song = host.playlist[index]
-          const audioUrl =
-            song.type === 'netease' ? `https://music.163.com/song/media/outer/url?id=${song.id}.mp3` : song.value
+          const audioUrl = getSongUrl(host.playlist[index])
           if (!audioUrl) return handlePlayError(index)
           try {
             audio.pause()
@@ -123,6 +136,7 @@ defineComponent(
           }
         },
         toggle: (): void => {
+          host.showVolumeBar = false
           if (host.currentIndex === -1) return void host.actions?.play(0)
           if (host.isPlaying) {
             audio.pause()
@@ -137,6 +151,7 @@ defineComponent(
           }
         },
         next: (isAuto = false): void => {
+          host.showVolumeBar = false
           if (isAuto && host.playMode === 'stop') return
           const nextIndex =
             host.playMode === 'random'
@@ -145,20 +160,23 @@ defineComponent(
           host.actions?.play(nextIndex)
         },
         prev: (): void => {
+          host.showVolumeBar = false
           host.actions?.play((host.currentIndex - 1 + host.playlist.length) % host.playlist.length)
         },
         switchMode: (): void => {
+          host.showVolumeBar = false
           const modes: PlayMode[] = ['list-loop', 'random', 'single-loop', 'stop']
           host.playMode = modes[(modes.indexOf(host.playMode) + 1) % modes.length]
-          showToast(`模式: ${host.playMode}`, 'info')
         },
         seek: (e: Known): void => {
+          host.showVolumeBar = false
           audio.currentTime = (parseFloat(e.target.value) / 100) * audio.duration
         },
         setVolume: (val: number): void => {
           audio.volume = host.volume = val
         },
         toggleFullscreen: (): void => {
+          host.showVolumeBar = false
           host.isFullscreen = !host.isFullscreen
         },
         openEditModal: (song, e): void => {
@@ -177,7 +195,10 @@ defineComponent(
                   host.playlist = playlist
                   showToast('同步成功', 'success')
                 },
-                Left: () => showToast('同步失败', 'error')
+                Left: ({ error }) => {
+                  console.error('Failed to sync playlist:', error)
+                  showToast(`同步失败：${error}`, 'error')
+                }
               })
             )
             .finally(() => {
@@ -193,7 +214,28 @@ defineComponent(
               Right: ({ playlist }) => {
                 host.playlist = playlist
               },
-              Left: () => showToast('排序失败', 'error')
+              Left: ({ error }) => {
+                console.error('Failed to set song order:', error)
+                showToast(`排序失败: ${error}`, 'error')
+              }
+            })
+          )
+        },
+        removeSong: (id): void => {
+          if (!confirm('确定要删除这首歌？')) return
+          if (id.length < 36) {
+            showToast('无法删除网易云歌单原始歌曲', 'warning')
+            return
+          }
+          httpClient.removeSong({ id }).then((res) =>
+            res.match({
+              Right: ({ playlist }) => {
+                host.playlist = playlist
+              },
+              Left: ({ error }) => {
+                console.error('Failed to remove song:', error)
+                showToast(`删除失败：${error}`, 'error')
+              }
             })
           )
         }
@@ -227,7 +269,10 @@ defineComponent(
                 host.playlist = playlist
                 showToast('添加成功', 'success')
               },
-              Left: () => showToast('添加失败', 'error')
+              Left: ({ error }) => {
+                console.error('Failed to add song:', error)
+                showToast(`添加失败：${error}`, 'error')
+              }
             })
           )
           .finally(() => {
@@ -238,7 +283,7 @@ defineComponent(
 
       const handleEdit = (e: Known): void => {
         httpClient
-          .setSongSource({ id: e.detail.id, source: e.detail.type, value: e.detail.value })
+          .setSongSource({ id: e.detail.id, source: e.detail.source, value: e.detail.value })
           .then((r) =>
             r.match({
               Right: ({ playlist }) => {
@@ -272,6 +317,12 @@ defineComponent(
         'single-loop': 'i-carbon-repeat-one',
         stop: 'i-carbon-stop-outline'
       }
+      const modeTitles: Record<PlayMode, string> = {
+        'list-loop': '列表循环',
+        random: '随机播放',
+        'single-loop': '单曲循环',
+        stop: '停止播放'
+      }
 
       const renderCover = (url?: string, className = '') => {
         const isBadCover = url ? host.coverErrorMap[url] : true
@@ -284,106 +335,217 @@ defineComponent(
           host.coverErrorMap = { ...host.coverErrorMap, [url]: true }
         }} />`
       }
+      const commonControls = (isFull: boolean) => {
+        const song = host.playlist[host.currentIndex]
 
-      const commonControls = (isFull: boolean) => html`
-        <div class="flex flex-col gap-3 w-full">
-          <div class="group relative h-1.5 bg-[var(--lx-border)] cursor-pointer w-full rounded-full overflow-hidden">
-            <input type="range" min="0" max="100" step="0.1" .value=${host.progress.toString()}
-                   @mousedown=${() => {
-                     host.isDragging = true
-                   }}
-                   @mouseup=${(e: Known) => {
-                     host.isDragging = false
-                     host.actions?.seek(e)
-                   }}
-                   @input=${(e: Known) => {
-                     host.progress = parseFloat(e.target.value)
-                   }}
-                   class="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" />
-            <div class="absolute h-full bg-[var(--lx-accent)] pointer-events-none" style="width: ${host.progress}%">
-              <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover:scale-100 transition-transform border border-[var(--lx-accent)]"></div>
-            </div>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="${isFull ? 'hidden' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}" @click=${() => host.actions?.toggleFullscreen()}>
-              ${renderCover(song?.cover, 'w-10 h-10 rounded bg-[var(--lx-main)] object-cover border border-[var(--lx-border)]')}
-              <div class="min-w-0">
-                <div class="text-sm font-bold truncate">${song?.name ?? '未在播放'}</div>
-                <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song?.artists?.join(' & ') ?? '...'}</div>
-              </div>
-            </div>
-            <div class="flex items-center gap-6">
-              <button @click=${() => host.actions?.prev()} class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)]"></button>
-              <button @click=${() => host.actions?.toggle()} class="w-11 h-11 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90">
-                <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
-              </button>
-              <button @click=${() => host.actions?.next()} class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)]"></button>
-            </div>
-            <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
-              <span class="ml-4 font-mono text-[10px] opacity-40">${host.currentTime} / ${host.duration}</span>
-              <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:text-[var(--lx-accent)]" @click=${() => host.actions?.switchMode()}></div>
-              <div class="flex items-center gap-2 group/vol">
-                <div class="i-carbon-volume-up text-lg opacity-40 group-hover/vol:opacity-100"></div>
-                <input type="range" min="0" max="1" step="0.01" .value=${host.volume.toString()} 
-                  @input=${(e: Known) => host.actions?.setVolume(parseFloat(e.target.value))} 
-                  class="w-16 h-1 accent-[var(--lx-accent)] cursor-pointer appearance-none bg-transparent outline-none border-none ring-0 focus:ring-0 focus:outline-none" 
-                  style="-webkit-appearance: none; outline: none; border: none;" />
-              </div>
-              ${!isFull ? html`<div class="i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
-            </div>
-          </div>
-        </div>
-      `
-
-      return html`
-    <div class="flex h-screen bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden select-none">
-      <side-nav></side-nav>
-      <main class="flex-1 flex flex-col min-w-0 relative order-1 md:order-2">
-        <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
-          <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white">
-            <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
-          </button>
-          <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-border)]">
-            <div class="i-carbon-add"></div><span>添加歌曲</span>
-          </button>
-        </div>
-        <div class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] bg-[var(--lx-bg-alt)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
-          <span>#</span><span>歌曲名</span><span>歌手</span><span class="hidden md:block">类型</span><span class="text-right pr-4">操作</span>
-        </div>
-        <div class="flex-1 overflow-y-auto no-scrollbar relative">
-          ${host.playlist.map(
-            (item, index) => html`
-            <div @dblclick=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[#f2f2f2] ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
-              <div class="flex items-center gap-1 text-xs opacity-40"><div class="i-carbon-drag-vertical opacity-0 group-hover:opacity-100"></div><span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span></div>
-              <div class="truncate pr-4 font-medium">${item.name}</div>
-              <div class="truncate text-xs opacity-60">${item.artists.join(' & ')}</div>
-              <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-40 w-fit">${item.type}</div>
-              <div class="flex justify-end pr-4 opacity-0 group-hover:opacity-100"><button @click=${(e: Event) => (host.isPlaying ? showToast('播放中无法编辑歌曲') : host.actions?.openEditModal(item, e))} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button></div>
-            </div>`
-          )}
-        </div>
-        <footer class="h-24 md:h-20 border-t border-[var(--lx-border)] bg-[var(--lx-bg-alt)] px-4 flex items-center shrink-0">
-          ${commonControls(false)}
-        </footer>
-      </main>
-
-      <div class="fixed inset-0 bg-[var(--lx-main)] z-100 transition-transform duration-500 ${host.isFullscreen ? 'translate-y-0' : 'translate-y-full'} flex items-center justify-center">
-        <button @click=${() => host.actions?.toggleFullscreen()} class="absolute top-8 left-8 i-carbon-chevron-down text-4xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)]"></button>
-        <div class="w-full max-w-6xl px-12 flex flex-col md:flex-row items-center justify-center gap-16 md:gap-24">
-          <div class="flex flex-col gap-10 w-64 md:w-[420px] shrink-0">
-            ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
-            ${commonControls(true)}
-          </div>
-          <div class="flex-1 flex flex-col gap-6 text-center md:text-left">
-            <h1 class="text-4xl md:text-7xl font-black text-[var(--lx-accent)] tracking-tighter">${song?.name ?? '未知曲目'}</h1>
-            <p class="text-2xl md:text-3xl opacity-40 font-medium">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
-          </div>
+        return html`
+    <div class="flex flex-col gap-3 w-full">
+      <div class="group relative h-1.5 bg-[var(--lx-border)] cursor-pointer w-full rounded-full">
+        <input type="range" min="0" max="100" step="0.1" .value=${host.progress.toString()}
+               @mousedown=${() => {
+                 host.isDragging = true
+               }}
+               @mouseup=${(e: Known) => {
+                 host.isDragging = false
+                 host.actions?.seek(e)
+               }}
+               @input=${(e: Known) => {
+                 host.progress = parseFloat(e.target.value)
+               }}
+               class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer" />
+        <div class="absolute h-full bg-[var(--lx-accent)] pointer-events-none rounded-full" style="width: ${host.progress}%">
+          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover:scale-100 transition-transform border border-[var(--lx-accent)]"></div>
         </div>
       </div>
 
-      ${host.addModalOpen ? html`<add-song-modal .isOpen=${true} @close=${() => (host.addModalOpen = false)}></add-song-modal>` : ''}
-      ${host.editModalOpen && host.editingSong ? html`<edit-song-modal .isOpen=${true} .song=${host.editingSong} @close=${() => (host.editModalOpen = false)}></edit-song-modal>` : ''}
-    </div>`
+      <div class="flex items-center justify-between relative">
+        <div class="${isFull ? 'hidden' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}" @click=${() => host.actions?.toggleFullscreen()}>
+          ${renderCover(song?.cover, 'w-10 h-10 rounded bg-[var(--lx-main)] object-cover border border-[var(--lx-border)]')}
+          <div class="hidden sm:block min-w-0">
+            <div class="text-sm font-bold truncate">${song?.name ?? '未在播放'}</div>
+            <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song?.artists?.join(' & ') ?? '...'}</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-6">
+          <button @click=${() => host.actions?.prev()} class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
+          <button @click=${() => host.actions?.toggle()} class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+            <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
+          </button>
+          <button @click=${() => host.actions?.next()} class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
+        </div>
+
+        <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
+          <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
+          
+          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:text-[var(--lx-accent)] opacity-40" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
+
+          <div class="relative flex items-center">
+            <div class="absolute bottom-full right-0 mb-10 px-4 py-3 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-2xl shadow-2xl transition-all duration-200 origin-bottom-right hover:bg-[var(--lx-bg-alt)]
+                        ${host.showVolumeBar ? 'scale-100 opacity-100 visible' : 'scale-90 opacity-0 invisible pointer-events-none'}"
+                 @click=${(e: Event) => e.stopPropagation()}>
+              
+              <div class="flex items-center gap-3 w-40">
+                <div class="relative flex-1 h-1 bg-[var(--lx-border)] rounded-full">
+                  <div class="absolute h-full bg-[var(--lx-accent)] rounded-full" style="width: ${host.volume * 100}%"></div>
+                  <input type="range" min="0" max="1" step="0.001" 
+                         .value=${host.volume.toString()}
+                         @input=${(e: Known) => host.actions?.setVolume(parseFloat(e.target.value))}
+                         class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border border-[var(--lx-accent)] rounded-full shadow-sm pointer-events-none"
+                       style="left: calc(${host.volume * 100}% - 6px)"></div>
+                </div>
+                <span class="font-mono text-[10px] font-bold opacity-60 w-8 text-right">${Math.round(host.volume * 100)}%</span>
+              </div>
+            </div>
+
+            <div class="i-carbon-volume-up text-xl cursor-pointer ${host.showVolumeBar ? 'text-[var(--lx-accent)]' : 'opacity-40 hover:opacity-100'}"
+                 @click=${(e: Event) => {
+                   e.stopPropagation()
+                   host.showVolumeBar = !host.showVolumeBar
+                 }}>
+            </div>
+          </div>
+
+          ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <style>
+      /* 针对精细化滑块的样式，确保点击不偏移 */
+      input[type=range] { -webkit-appearance: none; background: transparent; margin: 0; }
+      input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; cursor: pointer; }
+    </style>
+  `
+      }
+
+      return html`
+  <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden select-none">
+    <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
+      <div class="flex-none flex items-center justify-end gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
+        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white">
+          <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
+        </button>
+        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-border)]">
+          <div class="i-carbon-add"></div><span>添加歌曲</span>
+        </button>
+      </div>
+      <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] bg-[var(--lx-bg-alt)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
+        <span>#</span>
+        <span>歌曲名</span>
+        <span>歌手</span>
+        <span class="hidden md:block">类型</span>
+        <span class="text-right pr-4">操作</span>
+      </div>
+      <div class="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
+        ${
+          host.playlistLoading
+            ? html`
+            <div class="flex flex-col items-center justify-center h-full gap-3 opacity-30">
+              <div class="i-carbon-renew animate-spin text-3xl"></div>
+              <span class="text-sm">加载中...</span>
+            </div>
+          `
+            : host.playlist.length === 0
+              ? html`
+            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-30 select-none">
+              <div class="i-carbon-music text-5xl"></div>
+              <div class="text-center">
+                <div class="text-sm font-medium">还没有歌曲</div>
+                <div class="text-xs mt-1 opacity-70">同步歌单或手动添加歌曲</div>
+              </div>
+            </div>
+          `
+              : host.playlist.map(
+                  (item, index) => html`
+              <div @click=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[#f2f2f2] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
+                <div class="flex items-center text-xs opacity-40">
+                  <span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span>
+                </div>
+                <div class="truncate pr-4 font-medium">${item.name}</div>
+                <div class="truncate text-xs opacity-60">${item.artists.join(' & ')}</div>
+                <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-40 w-fit">${item.type}</div>
+                <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[#f2f2f2] via-[#f2f2f2] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  ${
+                    index === 0
+                      ? ''
+                      : html`<button title="向上" @click=${(e: Event) => {
+                          e.stopPropagation()
+                          host.isPlaying
+                            ? showToast('播放中无法调整歌曲')
+                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index - 0.5))
+                        }} class="ml-1 i-carbon-arrow-up hover:text-[var(--lx-accent)]"></button>`
+                  }
+                  ${
+                    index === host.playlist.length - 1
+                      ? ''
+                      : html`<button title="向下" @click=${(e: Event) => {
+                          e.stopPropagation()
+                          host.isPlaying
+                            ? showToast('播放中无法调整歌曲')
+                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index + 1.5))
+                        }} class="ml-1 i-carbon-arrow-down hover:text-[var(--lx-accent)]"></button>`
+                  }
+                  <button title="编辑源" @click=${(e: Event) => {
+                    e.stopPropagation()
+                    host.isPlaying ? showToast('播放中无法编辑歌曲') : host.actions?.openEditModal(item, e)
+                  }} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button>
+                  <button title="删除" @click=${(e: Event) => {
+                    e.stopPropagation()
+                    host.isPlaying ? showToast('播放中无法删除歌曲') : host.actions?.removeSong(item.id)
+                  }} class="ml-1 i-carbon-trash-can hover:text-[var(--lx-accent)]"></button>
+                  ${
+                    item.id.length < 36
+                      ? html`<button title="跳转" @click=${(e: Event) => {
+                          e.stopPropagation()
+                          window.open(`https://music.163.com/#/song?id=${item.id}`)
+                        }} class="ml-1 i-carbon-share hover:text-[var(--lx-accent)]"></button>`
+                      : ''
+                  }
+                </div>
+              </div>`
+                )
+        }
+      </div>
+      <footer class="flex-none h-24 md:h-20 border-t border-[var(--lx-border)] bg-[var(--lx-bg-alt)] px-4 flex items-center">
+        ${commonControls(false)}
+      </footer>
+    </main>
+
+    <div class="fixed inset-0 bg-[var(--lx-main)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
+      <button @click=${() => host.actions?.toggleFullscreen()}
+        class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-10">
+      </button>
+
+      <div class="flex flex-col md:hidden flex-1 min-h-0 px-8 pt-16 pb-6 gap-6">
+        <div class="flex-1 flex items-center justify-center min-h-0">
+          ${renderCover(song?.cover, 'w-full max-w-[220px] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+        </div>
+        <div class="flex flex-col gap-1 text-center shrink-0">
+          <h1 class="text-2xl font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
+          <p class="text-sm opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+        </div>
+        <div class="shrink-0">
+          ${commonControls(true)}
+        </div>
+      </div>
+
+      <div class="hidden md:flex w-full max-w-6xl px-12 flex-row items-center justify-center gap-24">
+        <div class="flex flex-col gap-10 w-[420px] shrink-0">
+          ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+          ${commonControls(true)}
+        </div>
+        <div class="flex-1 flex flex-col gap-6 text-left">
+          <h1 class="text-7xl font-black text-[var(--lx-accent)] tracking-tighter">${song?.name ?? '未知曲目'}</h1>
+          <p class="text-3xl opacity-40 font-medium">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+        </div>
+      </div>
+    </div>
+
+    ${host.addModalOpen ? html`<add-song-modal .isOpen=${true} @close=${() => (host.addModalOpen = false)}></add-song-modal>` : ''}
+        ${host.editModalOpen && host.editingSong ? html`<edit-song-modal .isOpen=${true} .song=${host.editingSong} @close=${() => (host.editModalOpen = false)}></edit-song-modal>` : ''}
+      </div>`
     }
   }
 )

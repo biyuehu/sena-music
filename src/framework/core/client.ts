@@ -21,6 +21,28 @@ export type InferExtractersToRequestData<Extracters extends Extracter<unknown>[]
         ? InferExtractersToRequestData<Rest>
         : EmptyObject
 
+// export type InferRouteToClientRoute<R extends RouteWith<Known>> = {
+//   [K in keyof R as R[K] extends Api<infer _, infer _, infer _, infer Returner>
+//     ? Returner extends
+//         | JsonRetutner<infer _, infer _>
+//         | TextReturner<string, string>
+//         | VirtualResourceReturner<infer _, infer _>
+//       ? K
+//       : never
+//     : K]: R[K] extends Api<
+//     infer Extracters extends Extracter<unknown>[],
+//     infer SuccessScheme,
+//     infer ErrorScheme,
+//     infer Returner
+//   >
+//     ? Returner extends VirtualResourceReturner<infer _, infer _>
+//       ? [InferExtractersToRequestData<Extracters>, unknown, unknown]
+//       : [InferExtractersToRequestData<Extracters>, z.infer<SuccessScheme>, z.infer<ErrorScheme>]
+//     : R[K] extends Route
+//       ? InferRouteToClientRoute<R[K]>
+//       : never
+// }
+
 export type InferRouteToClientRoute<R extends RouteWith<Known>> = {
   [K in keyof R as R[K] extends Api<infer _, infer __, infer ___, infer Returner>
     ? Returner extends JsonRetutner<infer _, infer __>
@@ -41,12 +63,12 @@ export type InferRouteToClientRoute<R extends RouteWith<Known>> = {
 export type InferClientRouteToFunction<R extends Record<string, unknown>> = {
   [K in keyof R]: R[K] extends [infer Req, infer Success, infer Error]
     ? Req extends { body: infer Body; query: infer Query }
-      ? (body: Body, query: Query, headers?: RequestInit['headers']) => Promise<Either<Error | string, Success>>
+      ? (body: Body, query: Query, headers?: RequestInit['headers']) => Promise<Either<Error, Success>>
       : Req extends { body: infer Body }
-        ? (body: Body, query?: null, headers?: RequestInit['headers']) => Promise<Either<Error | string, Success>>
+        ? (body: Body, query?: null, headers?: RequestInit['headers']) => Promise<Either<Error, Success>>
         : Req extends { query: infer Query }
           ? (body: null, query: Query, headers?: RequestInit['headers']) => Promise<Either<Error, Success>>
-          : (body?: null, query?: null, headers?: RequestInit['headers']) => Promise<Either<Error | string, Success>>
+          : (body?: null, query?: null, headers?: RequestInit['headers']) => Promise<Either<Error, Success>>
     : R[K] extends Record<string, unknown>
       ? InferClientRouteToFunction<R[K]>
       : never

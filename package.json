@@ -8,9 +8,9 @@
   "author": "Romi <me@hotaru.icu>",
   "scripts": {
     "dev:server": "bun --watch src/server/app.ts",
-    "dev:client": "parcel watch \"src/web/views/**\" --watch-dir src",
+    "dev:client": "parcel watch \"src/web/views/**\" --watch-dir src --no-cache",
     "dev": "concurrently -n server,client -c blue,red,green \"bun run dev:server\" \"bun run dev:client\"",
-    "build": "parcel build src/web/views/**"
+    "build": "parcel build src/web/views/** --no-cache"
   },
   "dependencies": {
     "@kotori-bot/i18n": "^1.3.3",

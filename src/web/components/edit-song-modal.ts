@@ -13,9 +13,7 @@ export const editSongModal = defineComponent(
   {
     useGlobalStyles: true,
     render: (host) => {
-      if (!host.isOpen || !host.song) {
-        return html``
-      }
+      if (!host.isOpen || !host.song) return html``
 
       const handleClose = () => {
         if (host.isLoading) return
@@ -24,7 +22,7 @@ export const editSongModal = defineComponent(
       }
 
       const handleSubmit = (): void => {
-        if (!host.song?.value?.trim()) {
+        if (!host.song?.value?.trim() && host.song?.type !== 'netease') {
           showToast('歌曲地址不能为空', 'error')
           return
         }
@@ -78,7 +76,7 @@ export const editSongModal = defineComponent(
 
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲类型</label>
+                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲源</label>
                 <select
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                   .value=${host.song.type}
@@ -95,7 +93,7 @@ export const editSongModal = defineComponent(
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲地址</label>
+                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲值</label>
                 <input
                   type="text"
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
@@ -118,7 +116,7 @@ export const editSongModal = defineComponent(
               <button
                 class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 @click=${handleSubmit}
-                ?disabled=${host.isLoading || !host.song.value.trim()}
+                ?disabled=${host.isLoading || (!host.song.value.trim() && host.song.type !== 'netease')}
               >
                 ${host.isLoading ? '保存中...' : '保存修改'}
               </button>

@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { sleep } from 'bun'
 import { songSourceTypeSchema } from 'src/common/types'
 import z from 'zod'
-import { Action, BodyExtracter } from '@/romi'
+import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
 import type { AppState } from './common'
@@ -14,7 +13,7 @@ export const getPlaylistHandler = Action.empty<AppState>().bind(async (_data, { 
   Data.load().match({
     Right: (playlist) => Right({ playlist }),
     Left: (err) => {
-      logger.error(err)
+      logger.error('Failed to load playlist:', err)
       return Left({ error: stringifyCatchError(err) })
     }
   })
@@ -30,10 +29,8 @@ export const setSongSourceHandler = Action.empty<AppState>()
       })
     )
   ] as const)
-  .bind(async ([data], { logger }) => {
-    const { id, source, value } = data
-
-    return Data.load().match({
+  .bind(async ([{ id, source, value }], { logger }) =>
+    Data.load().match({
       Right: (playlist) => {
         const songIndex = playlist.findIndex((song) => song.id === id)
 
@@ -49,16 +46,16 @@ export const setSongSourceHandler = Action.empty<AppState>()
           logger.info(`Updated source for song ${id} to ${source}`)
           return Right({ playlist: updatedPlaylist })
         } catch (err) {
-          logger.error(`Failed to save playlist: ${stringifyCatchError(err)}`)
+          logger.error('Failed to save playlist:', err)
           return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
         }
       },
       Left: (err) => {
-        logger.error(`Failed to load playlist: ${stringifyCatchError(err)}`)
+        logger.error("Failed to load pla'ylist:", err)
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
-  })
+  )
 
 export const addSongHandler = Action.empty<AppState>()
   .use([
@@ -72,10 +69,8 @@ export const addSongHandler = Action.empty<AppState>()
       })
     )
   ] as const)
-  .bind(async ([data], { logger }) => {
-    const { name, artists, cover, type, value } = data
-
-    return Data.load().match({
+  .bind(async ([{ name, artists, cover, type, value }], { logger }) =>
+    Data.load().match({
       Right: (playlist) => {
         const newSong = {
           id: randomUUID(),
@@ -97,16 +92,16 @@ export const addSongHandler = Action.empty<AppState>()
           logger.info(`Added new song: ${name} by ${artists.join(', ')}`)
           return Right({ playlist: updatedPlaylist })
         } catch (err) {
-          logger.error(`Failed to save playlist: ${stringifyCatchError(err)}`)
+          logger.error('Failed to save playlist:', err)
           return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
         }
       },
       Left: (err) => {
-        logger.error(`Failed to load playlist: ${stringifyCatchError(err)}`)
+        logger.error('Failed to load playlist:', err)
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
-  })
+  )
 
 export const setSongOrderHandler = Action.empty<AppState>()
   .use([
@@ -117,10 +112,8 @@ export const setSongOrderHandler = Action.empty<AppState>()
       })
     )
   ] as const)
-  .bind(async ([data], { logger }) => {
-    const { id, order } = data
-
-    return Data.load().match({
+  .bind(async ([{ id, order }], { logger }) =>
+    Data.load().match({
       Right: (playlist) => {
         const targetIndex = playlist.findIndex((song) => song.id === id)
 
@@ -154,114 +147,173 @@ export const setSongOrderHandler = Action.empty<AppState>()
           logger.info(`Reordered song ${id} to position ${insertIndex}`)
           return Right({ playlist: updatedPlaylist })
         } catch (err) {
-          logger.error(`Failed to save playlist: ${stringifyCatchError(err)}`)
+          logger.error('Failed to save playlist:', err)
           return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
         }
       },
       Left: (err) => {
-        logger.error(`Failed to load playlist: ${stringifyCatchError(err)}`)
+        logger.error('Failed to load playlist:', err)
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
-  })
+  )
 
-export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
-  try {
-    // 1. 加载本地歌单
-    const localPlaylistResult = Data.load()
+export const removeSongHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }) =>
+    Data.load().match({
+      Right: (playlist) => {
+        const targetIndex = playlist.findIndex((song) => song.id === id)
 
-    if (localPlaylistResult.isLeft()) {
-      logger.error(`Failed to load local playlist: ${stringifyCatchError(localPlaylistResult.value)}`)
-      return Left({ error: `Failed to load local playlist: ${stringifyCatchError(localPlaylistResult.value)}` })
-    }
-
-    const localPlaylist = localPlaylistResult.value
-    logger.info(`Loaded local playlist with ${localPlaylist.length} songs`)
-
-    // 2. 从网易云获取最新歌单
-    const neteaseResult = await NeteaseFetcher.request()
-
-    if (neteaseResult.isNothing()) {
-      logger.error('Failed to fetch playlist from Netease')
-      return Left({ error: 'Failed to fetch playlist from Netease' })
-    }
-
-    const neteasePlaylist = neteaseResult.unwrap()
-    logger.info(`Fetched ${neteasePlaylist.length} songs from Netease`)
-
-    // 3. 分离本地歌单中的自定义歌曲和网易云歌曲
-    const customSongs = localPlaylist.filter((song) => song.type !== 'netease')
-    const localNeteaseSongs = localPlaylist.filter((song) => song.type === 'netease')
-
-    logger.info(`Found ${customSongs.length} custom songs, ${localNeteaseSongs.length} Netease songs in local playlist`)
-
-    // 4. 创建网易云歌曲的ID映射
-    const neteaseSongMap = new Map(neteasePlaylist.map((song) => [song.id, song]))
-    const localNeteaseSongMap = new Map(localNeteaseSongs.map((song) => [song.id, song]))
-
-    // 5. 合并逻辑：
-    // a. 保留所有自定义歌曲（保持原有order）
-    // b. 对于网易云歌曲：
-    //    - 如果本地有修改过的映射（type不是netease），保留本地版本
-    //    - 否则使用网易云的最新数据
-    //    - 如果网易云已删除该歌曲，则从合并结果中移除
-
-    // 首先收集所有需要保留的歌曲
-    const songsToKeep = new Map<string, (typeof localPlaylist)[0]>()
-
-    // 添加自定义歌曲
-    customSongs.forEach((song) => {
-      songsToKeep.set(song.id, song)
-    })
-
-    // 处理网易云歌曲
-    neteasePlaylist.forEach((neteaseSong) => {
-      const localSong = localNeteaseSongMap.get(neteaseSong.id)
-
-      if (localSong) {
-        // 如果本地有这首歌，检查是否有自定义映射
-        if (localSong.type !== 'netease') {
-          // 保留本地修改过的版本
-          songsToKeep.set(localSong.id, localSong)
-        } else {
-          // 使用网易云的最新数据，但保持原有的order（如果存在）
-          const order = localSong.order
-          songsToKeep.set(neteaseSong.id, { ...neteaseSong, order })
+        if (targetIndex === -1) {
+          logger.warn(`Song with id ${id} not found`)
+          return Left({ error: `Song with id ${id} not found` })
         }
-      } else {
-        // 网易云新增的歌曲
-        songsToKeep.set(neteaseSong.id, neteaseSong)
+
+        const updatedPlaylist = [...playlist.slice(0, targetIndex), ...playlist.slice(targetIndex + 1)]
+
+        try {
+          Data.save(updatedPlaylist)
+          logger.info(`Removed song with id ${id}`)
+          return Right({ playlist: updatedPlaylist })
+        } catch (err) {
+          logger.error('Failed to save playlist:', err)
+          return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
+        }
+      },
+      Left: (err) => {
+        logger.error('Failed to load playlist:', err)
+        return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
+  )
 
-    // 6. 转换为数组并按order排序
-    const mergedSongs = Array.from(songsToKeep.values()).sort((a, b) => a.order - b.order)
+export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
+  // 1. 加载本地歌单
+  const localPlaylistResult = Data.load()
+  if (localPlaylistResult.isLeft()) {
+    logger.error('Failed to load local playlist:', localPlaylistResult.value)
+    return Left({ error: `Failed to load local playlist: ${stringifyCatchError(localPlaylistResult.value)}` })
+  }
+  const localPlaylist = localPlaylistResult.value
 
-    // 7. 重新分配order值，确保满足gap要求
-    const reorderedPlaylist = mergedSongs.map((song, index) => ({
-      ...song,
-      order: index * PLAYLIST_SONG_ORDER_GAP
-    }))
+  // 2. 从网易云获取最新歌单
+  const neteaseResult = await NeteaseFetcher.request()
+  if (neteaseResult.isNothing()) {
+    logger.error('Failed to fetch playlist from Netease')
+    return Left({ error: 'Failed to fetch playlist from Netease' })
+  }
+  const neteasePlaylist = neteaseResult.unwrap()
 
-    // 8. 保存合并后的歌单
-    try {
-      Data.save(reorderedPlaylist)
+  // 3. 预处理：建立本地数据的快速索引
+  // id.length >= 36 为自定义歌曲 (UUID)
+  const isCustom = (id: string) => id.length >= 36
+  const localMap = new Map(localPlaylist.map((s) => [s.id, s]))
 
-      const addedCount = reorderedPlaylist.length - localPlaylist.length
-      const removedCount = localPlaylist.length - reorderedPlaylist.length
-
-      logger.info(
-        `Sync completed: ${reorderedPlaylist.length} total songs ` +
-          `(${addedCount > 0 ? `+${addedCount} added` : ''}${removedCount > 0 ? `-${removedCount} removed` : ''})`
-      )
-
-      return Right({ playlist: reorderedPlaylist })
-    } catch (err) {
-      logger.error(`Failed to save synced playlist: ${stringifyCatchError(err)}`)
-      return Left({ error: `Failed to save synced playlist: ${stringifyCatchError(err)}` })
+  // 4. 更新网易云歌曲数据，但保留本地已修改的映射 (type !== 'netease')
+  const updatedNeteaseSongs = neteasePlaylist.map((nSong) => {
+    const localVersion = localMap.get(nSong.id)
+    // 如果本地存在且用户改过映射（比如改成了本地路径或其它 type），则保留本地版
+    if (localVersion && localVersion.type !== 'netease') {
+      return localVersion
     }
+    return { ...nSong } // 否则使用网易云最新元数据
+  })
+
+  const newNeteaseIdSet = new Set(updatedNeteaseSongs.map((s) => s.id))
+
+  // 5. 建立自定义歌曲的“锚点”映射
+  // key 是网易云歌曲 ID，value 是紧跟在其后的自定义歌曲列表
+  // null 键用于存放排在歌单最开头的自定义歌曲
+  const customGroups = new Map<string | null, typeof localPlaylist>()
+  let lastSeenNeteaseId: string | null = null
+
+  for (const song of localPlaylist) {
+    if (isCustom(song.id)) {
+      const group = customGroups.get(lastSeenNeteaseId) || []
+      group.push(song)
+      customGroups.set(lastSeenNeteaseId, group)
+    } else if (newNeteaseIdSet.has(song.id)) {
+      // 只有在新歌单中依然存在的网易云歌曲才能作为有效的“锚点”
+      lastSeenNeteaseId = song.id
+    }
+    // 如果网易云歌曲被删了，lastSeenNeteaseId 不更新，
+    // 那么原本跟在它后面的自定义歌曲会顺延到上一个有效的锚点
+  }
+
+  // 6. 线性合并：以网易云新顺序为骨架进行填充
+  const mergedPlaylist: typeof localPlaylist = []
+
+  // A. 首先插入原本就在最开头的自定义歌曲
+  if (customGroups.has(null)) {
+    mergedPlaylist.push(...(customGroups.get(null) ?? []))
+  }
+
+  // B. 遍历网易云新歌单，插入歌曲及其随后的自定义歌曲
+  for (const nSong of updatedNeteaseSongs) {
+    mergedPlaylist.push(nSong)
+    if (customGroups.has(nSong.id)) {
+      mergedPlaylist.push(...(customGroups.get(nSong.id) ?? []))
+    }
+  }
+
+  // C. 兜底逻辑：处理那些因为锚点全部消失而“无家可归”的自定义歌曲
+  const placedIds = new Set(mergedPlaylist.map((s) => s.id))
+  for (const song of localPlaylist) {
+    if (isCustom(song.id) && !placedIds.has(song.id)) {
+      mergedPlaylist.push(song)
+    }
+  }
+
+  // 7. 重新生成标准的 order 间隔
+  const finalPlaylist = mergedPlaylist.map((song, index) => ({
+    ...song,
+    order: index * PLAYLIST_SONG_ORDER_GAP
+  }))
+
+  // 8. 保存并返回
+  try {
+    Data.save(finalPlaylist)
+    logger.info(`Sync success: ${localPlaylist.length} -> ${finalPlaylist.length} songs.`)
+    return Right({ playlist: finalPlaylist })
   } catch (err) {
-    logger.error(`Sync failed: ${stringifyCatchError(err)}`)
-    return Left({ error: `Sync failed: ${stringifyCatchError(err)}` })
+    logger.error('Save failed:', stringifyCatchError(err))
+    return Left({ error: 'Save failed' })
   }
 })
+
+export const getAudioFilesHandler = Action.empty<AppState>()
+  .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }) =>
+    Data.load().match({
+      Right: (playlist) => {
+        const targetSong = playlist.find((song) => song.id === id)
+        if (!targetSong) {
+          logger.warn(`Song with id ${id} not found`)
+          return Left({ type: 'application/json', content: JSON.stringify({ error: `Song with id ${id} not found` }) })
+        }
+
+        if (targetSong.type !== 'local' || !targetSong.value.trim()) {
+          logger.warn(`Song with id ${id} is not a local file`)
+          return Left({
+            type: 'application/json',
+            content: JSON.stringify({ error: `Song with id ${id} is not a local file` })
+          })
+        }
+        return Right({
+          type: 'audio/mpeg',
+          path: targetSong.value,
+          headers: {
+            'Accept-Ranges': 'bytes'
+          }
+        })
+      },
+      Left: (err) => {
+        logger.error('Failed to load playlist:', err)
+        return Left({
+          type: 'application/json',
+          content: JSON.stringify(`Failed to load playlist: ${stringifyCatchError(err)}`)
+        })
+      }
+    })
+  )

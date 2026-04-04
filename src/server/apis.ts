@@ -1,7 +1,25 @@
 import { playListSchema } from 'src/common/types'
 import z from 'zod'
-import { Action, Api, AssetsReturner, any, JsonRetutner, type RouteWith, standardJsonReturnErrorSchema } from '@/romi'
-import { addSongHandler, getPlaylistHandler, setSongOrderHandler, setSongSourceHandler, syncHandler } from './actions'
+import {
+  Action,
+  Api,
+  AssetsReturner,
+  any,
+  JsonRetutner,
+  type RouteWith,
+  standardJsonReturnErrorSchema,
+  VirtualResourceReturner,
+  virtualResourceReturnSchema
+} from '@/romi'
+import {
+  addSongHandler,
+  getAudioFilesHandler,
+  getPlaylistHandler,
+  removeSongHandler,
+  setSongOrderHandler,
+  setSongSourceHandler,
+  syncHandler
+} from './actions'
 import type { AppState } from './common'
 
 const getPlaylist = Api.new(
@@ -32,11 +50,25 @@ const setSongOrder = Api.new(
   new JsonRetutner()
 )
 
+const removeSong = Api.new(
+  removeSongHandler,
+  z.object({ playlist: playListSchema }),
+  standardJsonReturnErrorSchema,
+  new JsonRetutner()
+)
+
 const sync = Api.new(
   syncHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
   new JsonRetutner()
+)
+
+const getAudioFiles = Api.new(
+  getAudioFilesHandler,
+  virtualResourceReturnSchema,
+  virtualResourceReturnSchema,
+  new VirtualResourceReturner()
 )
 
 const assets = Api.new(
@@ -65,6 +97,8 @@ export const appRoute = {
   setSongSource,
   addSong,
   setSongOrder,
+  removeSong,
   sync,
+  getAudioFiles,
   [any]: assets
 } satisfies RouteWith<AppState>

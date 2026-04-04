@@ -151,7 +151,7 @@ export const addSongModal = defineComponent(
               </div>
               
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲类型</label>
+                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲源</label>
                 <select
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                   .value=${host.form.type}
@@ -169,7 +169,7 @@ export const addSongModal = defineComponent(
               </div>
               
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲地址 *</label>
+                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲类型 *</label>
                 <input
                   type="text"
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
@@ -184,7 +184,6 @@ export const addSongModal = defineComponent(
             </div>
             
             <div class="flex gap-3 mt-8">
-            ${[host.isLoading, !host.form.name.trim(), !host.form.value.trim()]}
               <button
                 class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:bg-[var(--lx-border-dark)]"
                 @click=${handleClose}
