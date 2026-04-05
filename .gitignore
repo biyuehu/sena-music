@@ -3,3 +3,4 @@ dist
 .parcel-cache
 public
 src/web/views/uno.css
+data/cookies.txt

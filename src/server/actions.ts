@@ -1,10 +1,13 @@
+import { exec } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { promisify } from 'node:util'
 import { songSourceTypeSchema } from 'src/common/types'
 import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
-import type { AppState } from './common'
+import { type AppState, RUNTIME } from './common'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
 import { NeteaseFetcher } from './fetcher'
@@ -203,7 +206,7 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
     logger.error('Failed to fetch playlist from Netease')
     return Left({ error: 'Failed to fetch playlist from Netease' })
   }
-  const neteasePlaylist = neteaseResult.unwrap()
+  const neteasePlaylist = neteaseResult.value
 
   // 3. 预处理：建立本地数据的快速索引
   // id.length >= 36 为自定义歌曲 (UUID)
@@ -282,7 +285,7 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
   }
 })
 
-export const getAudioFilesHandler = Action.empty<AppState>()
+export const getLocalAudioFilesHandler = Action.empty<AppState>()
   .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
   .bind(async ([{ id }], { logger }) =>
     Data.load().match({
@@ -300,6 +303,7 @@ export const getAudioFilesHandler = Action.empty<AppState>()
             content: JSON.stringify({ error: `Song with id ${id} is not a local file` })
           })
         }
+        logger.info(`Serving song with id ${id} as a local file: ${targetSong.value}`)
         return Right({
           type: 'audio/mpeg',
           path: targetSong.value,
@@ -317,3 +321,40 @@ export const getAudioFilesHandler = Action.empty<AppState>()
       }
     })
   )
+
+export const getYoutubeAudioUrlHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }) => {
+    const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
+    if (data.isLeft()) {
+      logger.error('Failed to load playlist:', data.value)
+      return Left({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` })
+    }
+    if (data.value === void 0) {
+      logger.warn(`Song with id ${id} not found`)
+      return Left({ error: `Song with id ${id} not found` })
+    }
+
+    if (data.value.type !== 'youtube' || !data.value.value.trim()) {
+      logger.warn(`Song with id ${id} is not a YouTube video`)
+      return Left({ error: `Song with id ${id} is not a YouTube video` })
+    }
+
+    try {
+      logger.info(`Getting YouTube audio URL for song with id ${id} ...`)
+
+      const { stdout, stderr } = await promisify(exec)(
+        `yt-dlp${existsSync(Data.COOKIES_DATA_FILE) ? ` --cookies "${Data.COOKIES_DATA_FILE}"` : ''} --js-runtimes ${RUNTIME} --remote-components ejs:github --extractor-args "youtube:player_client=web,web_embedded" -g -f bestaudio "${data.value.value}"`,
+        {
+          maxBuffer: 10 * 1024 * 1024
+        }
+      )
+
+      if (stderr) logger.warn('Warning from yt-dlp:', stderr.trim())
+      logger.info(`Got YouTube audio URL for song with id ${id}: ${stdout.trim()}`)
+      return Right({ url: stdout.trim() })
+    } catch (err) {
+      logger.error('Failed to get audio URL:', err)
+      return Left({ error: `Failed to get audio URL: ${stringifyCatchError(err)}` })
+    }
+  })

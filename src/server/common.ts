@@ -22,3 +22,5 @@ export const CONFIG = {
   dataDirectory: 'data',
   playlistId: 2653919517
 }
+
+export const RUNTIME = process.versions.bun ? 'bun' : 'node'

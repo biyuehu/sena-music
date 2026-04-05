@@ -7,6 +7,7 @@ import { PLAYLIST_SONG_ORDER_GAP } from 'src/server/constant'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
 import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
+import { Cache } from '../cache'
 import { httpClient } from '../client'
 import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
@@ -14,7 +15,7 @@ import { showToast } from './toast'
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
 
 interface PlayerActions {
-  play: (index: number) => Promise<void>
+  play: (index: number, onlyLoad?: boolean) => Promise<void>
   toggle: () => void
   next: (isAuto?: boolean) => void
   prev: () => void
@@ -79,6 +80,15 @@ defineComponent(
               Right: ({ playlist }) => {
                 host.playlist = playlist
                 host.playlistError = Nothing()
+                const lastPlayCache = Cache.get<string>('play-song')
+                if (lastPlayCache.isNothing()) return
+                const [indexStr, name] = lastPlayCache.value.split('|')
+                const index = parseInt(indexStr, 10)
+                if (Number.isNaN(index) || index < 0 || index >= playlist.length || playlist[index].name !== name) {
+                  Cache.remove('play-song')
+                  return
+                }
+                host.actions?.play(index, true)
               },
               Left: ({ error }) => {
                 console.error('Failed to load playlist:', error)
@@ -96,40 +106,48 @@ defineComponent(
       const audio: HTMLAudioElement = new Audio()
       audio.volume = host.volume
 
-      const handlePlayError = (index: number): void => {
+      const handlePlayError = (index: number, error?: string): void => {
         const shouldAutoNext = host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
-
+        if (error) console.error(`Failed to play song ${index}:`, error)
         if (shouldAutoNext) {
-          showToast(`资源失效，2秒后跳过...`, 'error')
+          showToast(error ? `播放错误：${error}，2秒后跳过...` : `资源失效，2秒后跳过...`, 'error')
           host.playErrorTimeout = setTimeout(() => {
             if (host.currentIndex === index) {
               host.actions?.next(true)
             }
           }, 2000)
         } else {
-          showToast(`播放失败`, 'error')
+          showToast(error ? `播放错误：${error}` : `播放失败`, 'error')
         }
       }
 
       const actions: PlayerActions = {
-        play: async (index: number): Promise<void> => {
+        play: async (index: number, onlyLoad = false): Promise<void> => {
           host.showVolumeBar = false
           if (index < 0 || index >= host.playlist.length) return
           if (host.playErrorTimeout !== null) {
             clearTimeout(host.playErrorTimeout)
             host.playErrorTimeout = null
           }
+          audio.currentTime = 0
+          audio.pause()
           host.currentIndex = index
-          const audioUrl = getSongUrl(host.playlist[index])
-          if (!audioUrl) return handlePlayError(index)
+          const audioUrl = await getSongUrl(host.playlist[index], showToast)
+          if (audioUrl.isLeft()) {
+            return handlePlayError(index, audioUrl.value)
+          }
+          if (!audioUrl.value) return handlePlayError(index)
+          if (host.currentIndex !== index) return
           try {
             audio.pause()
-            audio.src = audioUrl
+            audio.src = audioUrl.value
             audio.load()
+            if (onlyLoad) return
             await audio.play()
             host.isPlaying = true
+            Cache.set('play-song', `${host.currentIndex}|${host.playlist[host.currentIndex].name}`)
           } catch (err) {
             console.error('Failed to play:', err)
             handlePlayError(index)
@@ -153,6 +171,10 @@ defineComponent(
         next: (isAuto = false): void => {
           host.showVolumeBar = false
           if (isAuto && host.playMode === 'stop') return
+          if (host.playMode === 'single-loop') {
+            host.actions?.play(host.currentIndex)
+            return
+          }
           const nextIndex =
             host.playMode === 'random'
               ? Math.floor(Math.random() * host.playlist.length)
@@ -167,6 +189,7 @@ defineComponent(
           host.showVolumeBar = false
           const modes: PlayMode[] = ['list-loop', 'random', 'single-loop', 'stop']
           host.playMode = modes[(modes.indexOf(host.playMode) + 1) % modes.length]
+          Cache.set('play-mode', host.playMode)
         },
         seek: (e: Known): void => {
           host.showVolumeBar = false
@@ -174,6 +197,7 @@ defineComponent(
         },
         setVolume: (val: number): void => {
           audio.volume = host.volume = val
+          Cache.set('play-volume', val)
         },
         toggleFullscreen: (): void => {
           host.showVolumeBar = false
@@ -301,6 +325,11 @@ defineComponent(
       document.addEventListener('add-song', handleAdd)
       document.addEventListener('edit-song-save', handleEdit)
 
+      const volume = Cache.get<number>('play-volume')
+      const mode = Cache.get<PlayMode>('play-mode')
+      if (volume.isJust()) host.actions.setVolume(volume.value)
+      if (mode.isJust()) host.playMode = mode.value
+
       return (): void => {
         audio.pause()
         audio.src = ''
@@ -378,7 +407,7 @@ defineComponent(
         <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
           <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
           
-          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:text-[var(--lx-accent)] opacity-40" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
+          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
 
           <div class="relative flex items-center">
             <div class="absolute bottom-full right-0 mb-10 px-4 py-3 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-2xl shadow-2xl transition-all duration-200 origin-bottom-right hover:bg-[var(--lx-bg-alt)]
@@ -421,7 +450,7 @@ defineComponent(
       }
 
       return html`
-  <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden select-none">
+  <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
       <div class="flex-none flex items-center justify-end gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
         <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white">
@@ -449,7 +478,7 @@ defineComponent(
           `
             : host.playlist.length === 0
               ? html`
-            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-30 select-none">
+            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-30">
               <div class="i-carbon-music text-5xl"></div>
               <div class="text-center">
                 <div class="text-sm font-medium">还没有歌曲</div>
@@ -489,7 +518,11 @@ defineComponent(
                   }
                   <button title="编辑源" @click=${(e: Event) => {
                     e.stopPropagation()
-                    host.isPlaying ? showToast('播放中无法编辑歌曲') : host.actions?.openEditModal(item, e)
+                    // if (host.isPlaying && host.currentIndex === index) {
+                    //   showToast('播放中无法编辑当前歌曲')
+                    //   return
+                    // }
+                    host.isPlaying ? '播放中无法编辑歌曲' : host.actions?.openEditModal(item, e)
                   }} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button>
                   <button title="删除" @click=${(e: Event) => {
                     e.stopPropagation()
@@ -543,8 +576,8 @@ defineComponent(
       </div>
     </div>
 
-    ${host.addModalOpen ? html`<add-song-modal .isOpen=${true} @close=${() => (host.addModalOpen = false)}></add-song-modal>` : ''}
-        ${host.editModalOpen && host.editingSong ? html`<edit-song-modal .isOpen=${true} .song=${host.editingSong} @close=${() => (host.editModalOpen = false)}></edit-song-modal>` : ''}
+      ${host.addModalOpen ? html`<add-song-modal .isOpen=${true} @close=${() => (host.addModalOpen = false)}></add-song-modal>` : ''}
+      ${host.editModalOpen && host.editingSong ? html`<edit-song-modal .isOpen=${true} .song=${host.editingSong} @close=${() => (host.editModalOpen = false)}></edit-song-modal>` : ''}
       </div>`
     }
   }

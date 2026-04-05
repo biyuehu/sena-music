@@ -9,6 +9,7 @@ import { PLAYLIST_DATA_FILENAME } from './constant'
 export namespace Data {
   export const DATA_DIRECTORY = join(process.cwd(), CONFIG.dataDirectory)
   export const PLAYLIST_DATA_FILE = join(DATA_DIRECTORY, PLAYLIST_DATA_FILENAME)
+  export const COOKIES_DATA_FILE = join(CONFIG.dataDirectory, 'cookies.txt')
 
   export function save(playlist: Playlist): void {
     writeFileSync(PLAYLIST_DATA_FILE, JSON.stringify(playlist, null, 2))

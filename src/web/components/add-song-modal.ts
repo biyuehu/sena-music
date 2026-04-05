@@ -26,6 +26,13 @@ export const addSongModal = defineComponent(
   },
   {
     useGlobalStyles: true,
+    styles: /* css */ `
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+    `,
     render: (host) => {
       if (!host.isOpen) return html``
 
@@ -112,7 +119,7 @@ export const addSongModal = defineComponent(
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲名称 *</label>
                 <input
                   type="text"
-                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
+                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                   .value=${host.form.name}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
@@ -126,7 +133,7 @@ export const addSongModal = defineComponent(
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌手 *</label>
                 <input
                   type="text"
-                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
+                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                   .value=${host.form.artists}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
@@ -140,7 +147,7 @@ export const addSongModal = defineComponent(
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">封面图片URL</label>
                 <input
                   type="text"
-                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
+                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                   .value=${host.form.cover}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
@@ -172,7 +179,7 @@ export const addSongModal = defineComponent(
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲类型 *</label>
                 <input
                   type="text"
-                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
+                  class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
                                     .value=${host.form.value}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
@@ -182,10 +189,9 @@ export const addSongModal = defineComponent(
                 />
               </div>
             </div>
-            
             <div class="flex gap-3 mt-8">
               <button
-                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:bg-[var(--lx-border-dark)]"
+                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-90"
                 @click=${handleClose}
                 ?disabled=${host.isLoading}
               >

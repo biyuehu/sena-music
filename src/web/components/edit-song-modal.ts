@@ -12,6 +12,13 @@ export const editSongModal = defineComponent(
   },
   {
     useGlobalStyles: true,
+    styles: /* css */ `
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+    `,
     render: (host) => {
       if (!host.isOpen || !host.song) return html``
 
@@ -53,11 +60,6 @@ export const editSongModal = defineComponent(
       return html`
         <div 
           class="fixed inset-0 bg-black/60 flex items-center justify-center z-200" 
-          @click=${(e: Event) => {
-            if ((e.target as HTMLElement).classList.contains('fixed')) {
-              handleClose()
-            }
-          }}
         >
           <div 
             class="bg-[var(--lx-main)] rounded-xl p-6 w-90% max-w-120 max-h-90vh overflow-y-auto border border-[var(--lx-border)] shadow-2xl"
@@ -75,6 +77,23 @@ export const editSongModal = defineComponent(
             </div>
 
             <div class="space-y-4">
+              <div>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">来源：<strong class="${host.song.id.length < 36 ? 'text-red' : 'text-[var(--lx-accent)]'}">${host.song.id.length < 36 ? '网易云' : '自定义'}</strong></span>
+              </div>
+              <div>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲名：<span class="select-all">${host.song.name}</span></span>
+              </div>
+              <div>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌手：<span class="select-all">${host.song.artists.join('、')}</span></span>
+              </div>
+              ${
+                host.song.cover.trim()
+                  ? html`
+              <div>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">封面：<a href="${host.song.cover}" target="_blank" class="select-text break-words">${host.song.cover}</a></span>
+              </div>`
+                  : ''
+              }
               <div>
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲源</label>
                 <select
@@ -107,7 +126,7 @@ export const editSongModal = defineComponent(
             </div>
             <div class="flex gap-3 mt-8">
               <button
-                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:bg-[var(--lx-border-dark)]"
+                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-90"
                 @click=${handleClose}
                 ?disabled=${host.isLoading}
               >

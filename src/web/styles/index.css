@@ -108,6 +108,16 @@ button:active {
   transform: scale(0.92);
 }
 
+a {
+  color: var(--lx-accent);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+a:hover {
+  color: var(--lx-text);
+}
+
 .modal-overlay {
   backdrop-filter: blur(4px);
   background: rgba(0, 0, 0, 0.4) !important;
