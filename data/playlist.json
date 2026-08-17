@@ -4401,5 +4401,16 @@
     "type": "netease",
     "value": "",
     "order": 39000
+  },
+  {
+    "id": "2c110a19-47c1-4b02-9a97-b5486b3e55f9",
+    "name": "だから僕は音楽を辞めた",
+    "artists": [
+      "アスル"
+    ],
+    "cover": "",
+    "type": "bili",
+    "value": "https://www.bilibili.com/video/BV14Gg46LEMh",
+    "order": 39100
   }
 ]

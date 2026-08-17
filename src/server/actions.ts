@@ -7,6 +7,7 @@ import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
+import { BiliFetcher } from './bili-fetcher'
 import { type AppState, RUNTIME } from './common'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
@@ -357,4 +358,66 @@ export const getYoutubeAudioUrlHandler = Action.empty<AppState>()
       logger.error('Failed to get audio URL:', err)
       return Left({ error: `Failed to get audio URL: ${stringifyCatchError(err)}` })
     }
+  })
+
+export const getBiliAudioFileHandler = Action.empty<AppState>()
+  .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }, meta) => {
+    const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
+    if (data.isLeft()) {
+      logger.error('Failed to load playlist:', data.value)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` }),
+        code: 500
+      })
+    }
+    if (data.value === void 0) {
+      logger.warn(`Song with id ${id} not found`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} not found` }),
+        code: 404
+      })
+    }
+
+    if (data.value.type !== 'bili' || !data.value.value.trim()) {
+      logger.warn(`Song with id ${id} is not a Bilibili source`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} is not a Bilibili source` }),
+        code: 400
+      })
+    }
+
+    logger.info(`Getting Bilibili audio for song "${data.value.name}" (id: ${id}, value: "${data.value.value}") ...`)
+
+    const audioSourceResult = await BiliFetcher.getAudioSource(data.value.value)
+    if (audioSourceResult.isNothing()) {
+      logger.error(`Failed to get Bilibili audio source for song ${id}`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: 'Failed to get Bilibili audio source' }),
+        code: 502
+      })
+    }
+
+    const audioSource = audioSourceResult.value
+    const proxyStreamResult = await BiliFetcher.fetchProxyStream(audioSource.url, meta.headers.range)
+    if (proxyStreamResult.isNothing()) {
+      logger.error(`Failed to fetch Bilibili audio stream for song ${id}`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: 'Failed to proxy Bilibili audio stream' }),
+        code: 502
+      })
+    }
+
+    const proxyStream = proxyStreamResult.value
+    return Right({
+      type: proxyStream.contentType,
+      stream: proxyStream.body,
+      code: proxyStream.status,
+      headers: proxyStream.headers
+    })
   })

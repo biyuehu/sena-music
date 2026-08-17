@@ -13,6 +13,7 @@ import {
 } from '@/romi'
 import {
   addSongHandler,
+  getBiliAudioFileHandler,
   getLocalAudioFilesHandler,
   getPlaylistHandler,
   getYoutubeAudioUrlHandler,
@@ -72,6 +73,13 @@ const getLocalAudioFiles = Api.new(
   new VirtualResourceReturner()
 )
 
+const getBiliAudioFile = Api.new(
+  getBiliAudioFileHandler,
+  virtualResourceReturnSchema,
+  virtualResourceReturnSchema,
+  new VirtualResourceReturner()
+)
+
 const getYoutubeAudioUrl = Api.new(
   getYoutubeAudioUrlHandler,
   z.object({ url: z.string() }),
@@ -108,6 +116,7 @@ export const appRoute = {
   removeSong,
   sync,
   getLocalAudioFiles,
+  getBiliAudioFile,
   getYoutubeAudioUrl,
   [any]: assets
 } satisfies RouteWith<AppState>
