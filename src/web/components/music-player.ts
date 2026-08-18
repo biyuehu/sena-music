@@ -9,6 +9,7 @@ import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
+import { getEffectiveTheme, initTheme, toggleTheme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
 
@@ -56,7 +57,8 @@ defineComponent(
     actions: Ref<PlayerActions | null>(null),
     playErrorTimeout: Ref<NodeJS.Timeout | null>(null),
     isUserManuallyPlaying: Ref<boolean>(false),
-    coverErrorMap: State<Record<string, boolean>>({})
+    coverErrorMap: State<Record<string, boolean>>({}),
+    isDark: State(getEffectiveTheme() === 'dark')
   },
   {
     useGlobalStyles: true,
@@ -325,6 +327,13 @@ defineComponent(
       document.addEventListener('add-song', handleAdd)
       document.addEventListener('edit-song-save', handleEdit)
 
+      initTheme()
+      const handleThemeChange = (e: Event) => {
+        const customEvent = e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>
+        host.isDark = customEvent.detail.effective === 'dark'
+      }
+      document.addEventListener('theme-change', handleThemeChange)
+
       const volume = Cache.get<number>('play-volume')
       const mode = Cache.get<PlayMode>('play-mode')
       if (volume.isJust()) host.actions.setVolume(volume.value)
@@ -336,6 +345,7 @@ defineComponent(
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
         document.removeEventListener('add-song', handleAdd)
         document.removeEventListener('edit-song-save', handleEdit)
+        document.removeEventListener('theme-change', handleThemeChange)
       }
     },
     render: (host): TemplateResult => {
@@ -459,6 +469,13 @@ defineComponent(
         <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-border)]">
           <div class="i-carbon-add"></div><span>添加歌曲</span>
         </button>
+        <button 
+          @click=${() => toggleTheme()} 
+          class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity" 
+          title="${host.isDark ? '切换至亮色模式' : '切换至暗色模式'}"
+        >
+          <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base"></div>
+        </button>
       </div>
       <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] bg-[var(--lx-bg-alt)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
         <span>#</span>
@@ -488,14 +505,14 @@ defineComponent(
           `
               : host.playlist.map(
                   (item, index) => html`
-              <div @click=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[#f2f2f2] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
+              <div @click=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
                 <div class="flex items-center text-xs opacity-40">
                   <span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span>
                 </div>
                 <div class="truncate pr-4 font-medium">${item.name}</div>
                 <div class="truncate text-xs opacity-60">${item.artists.join(' & ')}</div>
                 <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-40 w-fit">${item.type}</div>
-                <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[#f2f2f2] via-[#f2f2f2] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[var(--lx-hover)] via-[var(--lx-hover)] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   ${
                     index === 0
                       ? ''
@@ -546,7 +563,7 @@ defineComponent(
       </footer>
     </main>
 
-    <div class="fixed inset-0 bg-[var(--lx-main)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
+    <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
       <button @click=${() => host.actions?.toggleFullscreen()}
         class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-10">
       </button>

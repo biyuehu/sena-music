@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
+import { Readable } from 'node:stream'
 import { stringify } from 'devalue'
 import sirv from 'sirv'
 import z from 'zod'
@@ -80,11 +81,19 @@ export class TextReturner<R extends string, L extends string> extends Retutner<R
 export const virtualResourceReturnSchema = z.union([
   z.object({
     type: z.string(),
-    content: z.union([z.instanceof(Buffer), z.string()])
+    content: z.union([z.instanceof(Buffer), z.string()]),
+    code: z.number().optional(),
+    headers: z.record(z.string(), z.string()).optional()
   }),
   z.object({
     type: z.string(),
     path: z.string(),
+    code: z.number().optional(),
+    headers: z.record(z.string(), z.string()).optional()
+  }),
+  z.object({
+    type: z.string(),
+    stream: z.union([z.instanceof(ReadableStream), z.instanceof(Readable)]),
     code: z.number().optional(),
     headers: z.record(z.string(), z.string()).optional()
   })
@@ -97,38 +106,57 @@ export class VirtualResourceReturner<
   protected declare readonly brand: 'VirtualResourceReturner'
 
   public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
-    resRaw.setHeader('Content-Type', result.value.type)
     const data = result.match({
       Right: (result) => {
-        resRaw.statusCode = 200
+        resRaw.statusCode = result.code ?? 200
         return result
       },
       Left: (error) => {
-        resRaw.statusCode = 400
+        resRaw.statusCode = error.code ?? 400
         return error
       }
     })
 
     if ('content' in data) {
+      resRaw.setHeader('Content-Type', data.type)
+      if (data.headers) {
+        for (const [key, value] of Object.entries(data.headers)) {
+          resRaw.setHeader(key, value)
+        }
+      }
       resRaw.end(data.content)
       return
     }
 
-    if (data.code) resRaw.statusCode = data.code
-
-    const path = resolve(process.cwd(), data.path)
-    if (!existsSync(path)) {
-      resRaw.statusCode = 404
-      resRaw.end()
+    if ('stream' in data && data.stream) {
+      resRaw.writeHead(data.code ?? 200, {
+        'Content-Type': data.type,
+        ...data.headers
+      })
+      if (data.stream instanceof Readable) {
+        data.stream.pipe(resRaw)
+      } else if (data.stream instanceof ReadableStream) {
+        Readable.fromWeb(data.stream).pipe(resRaw)
+      }
       return
     }
 
-    resRaw.writeHead(data.code ?? 200, {
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': statSync(path).size,
-      ...data.headers
-    })
-    createReadStream(path).pipe(resRaw)
+    if ('path' in data) {
+      const path = resolve(process.cwd(), data.path)
+      if (!existsSync(path)) {
+        resRaw.statusCode = 404
+        resRaw.end()
+        return
+      }
+
+      resRaw.writeHead(data.code ?? 200, {
+        'Content-Type': data.type || 'audio/mpeg',
+        'Content-Length': statSync(path).size,
+        ...data.headers
+      })
+      createReadStream(path).pipe(resRaw)
+      return
+    }
   }
 }
 
