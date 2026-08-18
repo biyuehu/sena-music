@@ -2,7 +2,7 @@
   color-scheme: light;
   --lx-main: #ffffff;
   --lx-border: #dcdcdc;
-  --lx-accent: lightblue;
+  --lx-accent: #f9c2ad;
   --lx-text: #333;
   --lx-text-muted: #999;
   --lx-bg-alt: #f5f5f5;
@@ -188,7 +188,9 @@ a:hover {
 
 .modal-content {
   border: none !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
   animation: modal-in 0.2s ease-out;
 }
 
