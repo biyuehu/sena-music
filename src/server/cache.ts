@@ -3,6 +3,24 @@ import { join } from 'node:path'
 import { logger } from './common'
 import { Data } from './data'
 
+export function getCacheInfo(): { path: string; sizeBytes: number } {
+  if (!existsSync(Data.CACHE_DIRECTORY)) {
+    return { path: Data.CACHE_DIRECTORY, sizeBytes: 0 }
+  }
+  let totalSize = 0
+  const allFiles = readdirSync(Data.CACHE_DIRECTORY)
+  for (const name of allFiles) {
+    if (name.endsWith('.lock')) continue
+    try {
+      const stat = statSync(join(Data.CACHE_DIRECTORY, name))
+      totalSize += stat.size
+    } catch {
+      // ignore
+    }
+  }
+  return { path: Data.CACHE_DIRECTORY, sizeBytes: totalSize }
+}
+
 export function pruneCache(maxSizeBytes: number): void {
   if (!existsSync(Data.CACHE_DIRECTORY)) return
 

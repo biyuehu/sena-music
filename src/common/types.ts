@@ -62,3 +62,10 @@ export const settingsSchema = z.object({
 })
 
 export type Settings = z.infer<typeof settingsSchema>
+
+export const cacheInfoSchema = z.object({
+  path: z.string(),
+  sizeBytes: z.number().nonnegative()
+})
+
+export type CacheInfo = z.infer<typeof cacheInfoSchema>
