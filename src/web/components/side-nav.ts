@@ -23,6 +23,17 @@ export const sideNav = defineComponent(
       @media (max-width: 767px) {
         :host { width: 0; }
       }
+      [class^="i-"],
+      [class*=" i-"] {
+        display: inline-block;
+        vertical-align: middle;
+        filter: var(--lx-icon-filter, none);
+        transition: filter 0.2s ease, opacity 0.2s ease;
+      }
+      .text-white [class^="i-"],
+      .text-white [class*=" i-"] {
+        filter: invert(1) brightness(2) !important;
+      }
     `,
     connectedCallback: (host) => {
       initTheme()
@@ -80,7 +91,7 @@ export const sideNav = defineComponent(
         </div>
 
         <div class="flex-1 px-2 space-y-1">
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${host.activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] text-[var(--lx-text)]'}"
                @click=${() => {
                  host.activeItem = 'playlist'
                  host.isDrawerOpen = false
@@ -88,7 +99,7 @@ export const sideNav = defineComponent(
             <div class="i-carbon-list shrink-0"></div>
             <span>播放列表</span>
           </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'search' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${host.activeItem === 'search' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] text-[var(--lx-text)]'}"
                @click=${() => {
                  host.activeItem = 'search'
                  host.isDrawerOpen = false
@@ -96,7 +107,7 @@ export const sideNav = defineComponent(
             <div class="i-carbon-search shrink-0"></div>
             <span>搜索</span>
           </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${host.activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] text-[var(--lx-text)]'}"
                @click=${() => {
                  host.activeItem = 'settings'
                  host.isDrawerOpen = false
@@ -108,7 +119,7 @@ export const sideNav = defineComponent(
 
         <div class="p-3 border-t border-[var(--lx-border)]">
           <button
-            class="flex items-center justify-between px-3 py-2 rounded text-sm cursor-pointer w-full opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] transition-colors text-[var(--lx-text)]"
+            class="flex items-center justify-between px-3 py-2 rounded text-sm cursor-pointer w-full opacity-80 hover:opacity-100 hover:bg-[var(--lx-hover)] transition-colors text-[var(--lx-text)]"
             @click=${() => toggleTheme()}
             title="切换暗色/亮色模式"
           >
@@ -116,7 +127,7 @@ export const sideNav = defineComponent(
               <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base shrink-0"></div>
               <span class="text-xs font-medium">${host.isDark ? '暗色模式' : '亮色模式'}</span>
             </div>
-            <div class="text-[10px] px-1.5 py-0.5 rounded border border-[var(--lx-border)] opacity-60 font-mono">
+            <div class="text-[10px] px-1.5 py-0.5 rounded border border-[var(--lx-border)] text-[var(--lx-text-muted)] font-mono">
               ${host.isDark ? 'DARK' : 'LIGHT'}
             </div>
           </button>

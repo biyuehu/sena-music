@@ -63,15 +63,35 @@ defineComponent(
   {
     useGlobalStyles: true,
     styles: /* css */ `
-        :host {
-    /* 必须让自定义标签本身在父级 flex 中占满剩余空间 */
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0; /* 防止子元素撑破容器 */
-    width: 100%;
-  }
-      `,
+      :host {
+        /* 必须让自定义标签本身在父级 flex 中占满剩余空间 */
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0; /* 防止子元素撑破容器 */
+        width: 100%;
+      }
+      [class^="i-"],
+      [class*=" i-"] {
+        display: inline-block;
+        vertical-align: middle;
+        filter: var(--lx-icon-filter, none);
+        transition: filter 0.2s ease, opacity 0.2s ease;
+      }
+      button:hover > [class^="i-"],
+      button:hover > [class*=" i-"],
+      div:hover > [class^="i-"],
+      div:hover > [class*=" i-"] {
+        filter: var(--lx-icon-hover-filter, none);
+      }
+      .text-white [class^="i-"],
+      .text-white [class*=" i-"] {
+        filter: invert(1) brightness(2) !important;
+      }
+      button:hover > .i-carbon-trash-can {
+        filter: invert(40%) sepia(90%) saturate(2500%) hue-rotate(335deg) brightness(1.1) !important;
+      }
+    `,
 
     connectedCallback: (host): (() => void) => {
       const loadPlaylist = (): void => {
@@ -407,17 +427,21 @@ defineComponent(
         </div>
 
         <div class="flex items-center gap-6">
-          <button @click=${() => host.actions?.prev()} class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
-          <button @click=${() => host.actions?.toggle()} class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+          <button @click=${() => host.actions?.prev()} class="text-xl text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors opacity-90 hover:opacity-100 p-1" title="上一首">
+            <div class="i-carbon-skip-back-filled"></div>
+          </button>
+          <button @click=${() => host.actions?.toggle()} class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform" title="${host.isPlaying ? '暂停' : '播放'}">
             <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
           </button>
-          <button @click=${() => host.actions?.next()} class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
+          <button @click=${() => host.actions?.next()} class="text-xl text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors opacity-90 hover:opacity-100 p-1" title="下一首">
+            <div class="i-carbon-skip-forward-filled"></div>
+          </button>
         </div>
 
         <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
-          <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
+          <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-xs text-[var(--lx-text-muted)]">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
           
-          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
+          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-70 hover:text-[var(--lx-accent)] transition-colors" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
 
           <div class="relative flex items-center">
             <div class="absolute bottom-full right-0 mb-10 px-4 py-3 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-2xl shadow-2xl transition-all duration-200 origin-bottom-right hover:bg-[var(--lx-bg-alt)]
@@ -434,11 +458,11 @@ defineComponent(
                   <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border border-[var(--lx-accent)] rounded-full shadow-sm pointer-events-none"
                        style="left: calc(${host.volume * 100}% - 6px)"></div>
                 </div>
-                <span class="font-mono text-[10px] font-bold opacity-60 w-8 text-right">${Math.round(host.volume * 100)}%</span>
+                <span class="font-mono text-[10px] font-bold text-[var(--lx-text-muted)] w-8 text-right">${Math.round(host.volume * 100)}%</span>
               </div>
             </div>
 
-            <div class="i-carbon-volume-up text-xl cursor-pointer ${host.showVolumeBar ? 'text-[var(--lx-accent)]' : 'opacity-40 hover:opacity-100'}"
+            <div class="i-carbon-volume-up text-xl cursor-pointer ${host.showVolumeBar ? 'text-[var(--lx-accent)]' : 'opacity-70 hover:opacity-100 hover:text-[var(--lx-accent)] transition-colors'}"
                  @click=${(e: Event) => {
                    e.stopPropagation()
                    host.showVolumeBar = !host.showVolumeBar
@@ -446,7 +470,7 @@ defineComponent(
             </div>
           </div>
 
-          ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
+          ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-70 hover:opacity-100 hover:text-[var(--lx-accent)] cursor-pointer text-lg transition-colors" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
         </div>
       </div>
     </div>
@@ -463,15 +487,15 @@ defineComponent(
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
       <div class="flex-none flex items-center justify-end gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
-        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white">
+        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 transition-opacity font-medium">
           <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
         </button>
-        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-border)]">
+        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors">
           <div class="i-carbon-add"></div><span>添加歌曲</span>
         </button>
         <button 
           @click=${() => toggleTheme()} 
-          class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity" 
+          class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors" 
           title="${host.isDark ? '切换至亮色模式' : '切换至暗色模式'}"
         >
           <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base"></div>
@@ -488,31 +512,31 @@ defineComponent(
         ${
           host.playlistLoading
             ? html`
-            <div class="flex flex-col items-center justify-center h-full gap-3 opacity-30">
+            <div class="flex flex-col items-center justify-center h-full gap-3 opacity-50 text-[var(--lx-text-muted)]">
               <div class="i-carbon-renew animate-spin text-3xl"></div>
               <span class="text-sm">加载中...</span>
             </div>
           `
             : host.playlist.length === 0
               ? html`
-            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-30">
+            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-50 text-[var(--lx-text-muted)]">
               <div class="i-carbon-music text-5xl"></div>
               <div class="text-center">
                 <div class="text-sm font-medium">还没有歌曲</div>
-                <div class="text-xs mt-1 opacity-70">同步歌单或手动添加歌曲</div>
+                <div class="text-xs mt-1">同步歌单或手动添加歌曲</div>
               </div>
             </div>
           `
               : host.playlist.map(
                   (item, index) => html`
               <div @click=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
-                <div class="flex items-center text-xs opacity-40">
-                  <span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span>
+                <div class="flex items-center text-xs opacity-50 font-mono">
+                  <span>${(index + 1).toString().padStart(2, '0')}</span>
                 </div>
                 <div class="truncate pr-4 font-medium">${item.name}</div>
-                <div class="truncate text-xs opacity-60">${item.artists.join(' & ')}</div>
-                <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-40 w-fit">${item.type}</div>
-                <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[var(--lx-hover)] via-[var(--lx-hover)] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <div class="truncate text-xs text-[var(--lx-text-muted)]">${item.artists.join(' & ')}</div>
+                <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-60 text-[var(--lx-text-muted)] w-fit">${item.type}</div>
+                <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[var(--lx-hover)] via-[var(--lx-hover)] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity gap-1 text-[var(--lx-text)]">
                   ${
                     index === 0
                       ? ''
@@ -521,7 +545,7 @@ defineComponent(
                           host.isPlaying
                             ? showToast('播放中无法调整歌曲')
                             : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index - 0.5))
-                        }} class="ml-1 i-carbon-arrow-up hover:text-[var(--lx-accent)]"></button>`
+                        }} class="p-1 rounded hover:bg-[var(--lx-border)] text-sm hover:text-[var(--lx-accent)] transition-colors"><div class="i-carbon-arrow-up"></div></button>`
                   }
                   ${
                     index === host.playlist.length - 1
@@ -531,7 +555,7 @@ defineComponent(
                           host.isPlaying
                             ? showToast('播放中无法调整歌曲')
                             : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index + 1.5))
-                        }} class="ml-1 i-carbon-arrow-down hover:text-[var(--lx-accent)]"></button>`
+                        }} class="p-1 rounded hover:bg-[var(--lx-border)] text-sm hover:text-[var(--lx-accent)] transition-colors"><div class="i-carbon-arrow-down"></div></button>`
                   }
                   <button title="编辑源" @click=${(e: Event) => {
                     e.stopPropagation()
@@ -540,17 +564,17 @@ defineComponent(
                     //   return
                     // }
                     host.isPlaying ? '播放中无法编辑歌曲' : host.actions?.openEditModal(item, e)
-                  }} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button>
+                  }} class="p-1 rounded hover:bg-[var(--lx-border)] text-sm hover:text-[var(--lx-accent)] transition-colors"><div class="i-carbon-edit"></div></button>
                   <button title="删除" @click=${(e: Event) => {
                     e.stopPropagation()
                     host.isPlaying ? showToast('播放中无法删除歌曲') : host.actions?.removeSong(item.id)
-                  }} class="ml-1 i-carbon-trash-can hover:text-[var(--lx-accent)]"></button>
+                  }} class="p-1 rounded hover:bg-[var(--lx-border)] text-sm hover:text-red-400 transition-colors"><div class="i-carbon-trash-can"></div></button>
                   ${
                     item.id.length < 36
                       ? html`<button title="跳转" @click=${(e: Event) => {
                           e.stopPropagation()
                           window.open(`https://music.163.com/#/song?id=${item.id}`)
-                        }} class="ml-1 i-carbon-share hover:text-[var(--lx-accent)]"></button>`
+                        }} class="p-1 rounded hover:bg-[var(--lx-border)] text-sm hover:text-[var(--lx-accent)] transition-colors"><div class="i-carbon-share"></div></button>`
                       : ''
                   }
                 </div>
@@ -565,7 +589,8 @@ defineComponent(
 
     <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
       <button @click=${() => host.actions?.toggleFullscreen()}
-        class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-10">
+        class="absolute top-5 left-5 text-3xl opacity-70 hover:opacity-100 text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-all z-10 p-2" title="收起">
+        <div class="i-carbon-chevron-down"></div>
       </button>
 
       <div class="flex flex-col md:hidden flex-1 min-h-0 px-8 pt-16 pb-6 gap-6">
@@ -574,7 +599,7 @@ defineComponent(
         </div>
         <div class="flex flex-col gap-1 text-center shrink-0">
           <h1 class="text-2xl font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
-          <p class="text-sm opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+          <p class="text-sm text-[var(--lx-text-muted)] font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
         </div>
         <div class="shrink-0">
           ${commonControls(true)}
@@ -588,7 +613,7 @@ defineComponent(
         </div>
         <div class="flex-1 flex flex-col gap-6 text-left">
           <h1 class="text-7xl font-black text-[var(--lx-accent)] tracking-tighter">${song?.name ?? '未知曲目'}</h1>
-          <p class="text-3xl opacity-40 font-medium">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+          <p class="text-3xl text-[var(--lx-text-muted)] font-medium">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
         </div>
       </div>
     </div>
