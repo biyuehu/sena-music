@@ -1,0 +1,12 @@
+port = 3000
+dataDirectory = "data"
+playlistId = 2653919517
+cacheDirectory = "cache"
+cacheMaxSize = 1024
+
+[db]
+host = "localhost"
+port = 5432
+user = "user"
+password = "password"
+database = "database"

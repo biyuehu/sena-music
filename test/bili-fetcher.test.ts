@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { BiliFetcher } from '../src/server/bili-fetcher'
+import { BiliFetcher } from '../src/server/fetchers/bilibili'
 
 describe('BiliFetcher', () => {
   const testUrl = 'https://www.bilibili.com/video/BV14Gg46LEMh'

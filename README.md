@@ -2,4 +2,4 @@
 
 ## Fix
 
-- volume, playingmode  will removed automaticlly
+- test
