@@ -20,6 +20,8 @@ export async function getSongUrl(song: SongInfo, show?: typeof showToast): Promi
       return Right(`https://music.163.com/song/media/outer/url?id=${song.value || song.id}.mp3`)
     case 'local':
       return Right(`/getLocalAudioFiles?id=${song.id}`)
+    case 'bili':
+      return Right(`/getBiliAudioFile?id=${song.id}`)
     case 'youtube':
       return await (async () => {
         const key = `youtube-url-${song.value}`
