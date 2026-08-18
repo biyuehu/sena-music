@@ -141,10 +141,8 @@ defineComponent(
           audio.currentTime = 0
           audio.pause()
           host.currentIndex = index
-          const audioUrl = await getSongUrl(host.playlist[index], showToast)
-          if (audioUrl.isLeft()) {
-            return handlePlayError(index, audioUrl.value)
-          }
+          const audioUrl = await getSongUrl(host.playlist[index])
+          if (audioUrl.isLeft()) return handlePlayError(index, audioUrl.value)
           if (!audioUrl.value) return handlePlayError(index)
           if (host.currentIndex !== index) return
           try {

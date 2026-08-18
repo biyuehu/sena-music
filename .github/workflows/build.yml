@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Check format
+      - name: Check code
         run: bun run fix && git diff --exit-code
 
       - name: Build
