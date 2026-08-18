@@ -99,14 +99,7 @@ export const sideNav = defineComponent(
             <div class="i-carbon-list shrink-0"></div>
             <span>播放列表</span>
           </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${host.activeItem === 'search' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] text-[var(--lx-text)]'}"
-               @click=${() => {
-                 host.activeItem = 'search'
-                 host.isDrawerOpen = false
-               }}>
-            <div class="i-carbon-search shrink-0"></div>
-            <span>搜索</span>
-          </div>
+
           <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${host.activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] text-[var(--lx-text)]'}"
                @click=${() => {
                  host.activeItem = 'settings'
