@@ -1,4 +1,5 @@
 import { ConsoleTransport, Logger, LoggerLevel } from '@kotori-bot/logger'
+import { CONFIG } from './config'
 
 export type AppState = {
   logger: Logger
@@ -10,17 +11,6 @@ export const logger = new Logger({
   transports: new ConsoleTransport()
 })
 
-export const CONFIG = {
-  port: 3000,
-  db: {
-    host: 'localhost',
-    port: 5432,
-    user: 'user',
-    password: 'password',
-    database: 'database'
-  },
-  dataDirectory: 'data',
-  playlistId: 2653919517
-}
+export { CONFIG }
 
 export const RUNTIME = process.versions.bun ? 'bun' : 'node'

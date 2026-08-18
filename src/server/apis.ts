@@ -1,4 +1,4 @@
-import { playListSchema } from 'src/common/types'
+import { playListSchema, settingsSchema } from 'src/common/types'
 import z from 'zod'
 import {
   Action,
@@ -16,8 +16,10 @@ import {
   getBiliAudioFileHandler,
   getLocalAudioFilesHandler,
   getPlaylistHandler,
+  getSettingsHandler,
   getYoutubeAudioUrlHandler,
   removeSongHandler,
+  setSettingsHandler,
   setSongOrderHandler,
   setSongSourceHandler,
   syncHandler
@@ -87,6 +89,10 @@ const getYoutubeAudioUrl = Api.new(
   new JsonRetutner()
 )
 
+const getSettings = Api.new(getSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+
+const setSettings = Api.new(setSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+
 const assets = Api.new(
   Action.empty(),
   z.object(),
@@ -118,5 +124,7 @@ export const appRoute = {
   getLocalAudioFiles,
   getBiliAudioFile,
   getYoutubeAudioUrl,
+  getSettings,
+  setSettings,
   [any]: assets
 } satisfies RouteWith<AppState>

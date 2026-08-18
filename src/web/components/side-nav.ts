@@ -2,10 +2,11 @@ import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
 import { getEffectiveTheme, initTheme, toggleTheme } from '../theme'
 
+const activeItem = location.pathname.endsWith('settings.html') ? 'settings' : 'playlist'
+
 export const sideNav = defineComponent(
   'side-nav',
   {
-    activeItem: State('playlist'),
     isDrawerOpen: State(false),
     isDark: State(getEffectiveTheme() === 'dark')
   },
@@ -80,27 +81,13 @@ export const sideNav = defineComponent(
         </div>
 
         <div class="flex-1 px-2 space-y-1">
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
-               @click=${() => {
-                 host.activeItem = 'playlist'
-                 host.isDrawerOpen = false
-               }}>
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+               @click=${() => (window.location.href = 'index.html')}>
             <div class="i-carbon-list shrink-0"></div>
-            <span>播放列表</span>
+            <span>主页</span>
           </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'search' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
-               @click=${() => {
-                 host.activeItem = 'search'
-                 host.isDrawerOpen = false
-               }}>
-            <div class="i-carbon-search shrink-0"></div>
-            <span>搜索</span>
-          </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
-               @click=${() => {
-                 host.activeItem = 'settings'
-                 host.isDrawerOpen = false
-               }}>
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+               @click=${() => (window.location.href = 'settings.html')}>
             <div class="i-carbon-settings shrink-0"></div>
             <span>设置</span>
           </div>

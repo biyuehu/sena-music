@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sena Music</title>
+  <title>设置 - Sena Music</title>
   <script>
     try {
       const raw = localStorage.getItem('sena-cache:theme');
@@ -31,11 +31,11 @@
   <div id="app"
     class="flex h-dvh overflow-hidden absolute top-0 right-0 bottom-0 left-0 select-none">
     <side-nav></side-nav>
-    <music-player></music-player>
+    <settings-page></settings-page>
   </div>
   <script type="module" src="../components/toast.ts"></script>
   <script type="module" src="../components/side-nav.ts"></script>
-  <script type="module" src="../components/music-player.ts"></script>
+  <script type="module" src="../components/settings-page.ts"></script>
 </body>
 
 </html>

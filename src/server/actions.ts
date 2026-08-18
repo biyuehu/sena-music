@@ -2,16 +2,17 @@ import { exec } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
-import { songSourceTypeSchema } from 'src/common/types'
+import { settingsSchema, songSourceTypeSchema } from 'src/common/types'
 import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
-import { BiliFetcher } from './bili-fetcher'
-import { type AppState, RUNTIME } from './common'
+import { type AppState, CONFIG, RUNTIME } from './common'
+import { saveConfig } from './config'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
-import { NeteaseFetcher } from './fetcher'
+import { BiliFetcher } from './fetchers/bilibili'
+import { NeteaseFetcher } from './fetchers/netease'
 
 export const getPlaylistHandler = Action.empty<AppState>().bind(async (_data, { logger }) =>
   Data.load().match({
@@ -362,7 +363,7 @@ export const getYoutubeAudioUrlHandler = Action.empty<AppState>()
 
 export const getBiliAudioFileHandler = Action.empty<AppState>()
   .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
-  .bind(async ([{ id }], { logger }, meta) => {
+  .bind(async ([{ id }], { logger }) => {
     const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
     if (data.isLeft()) {
       logger.error('Failed to load playlist:', data.value)
@@ -392,32 +393,39 @@ export const getBiliAudioFileHandler = Action.empty<AppState>()
 
     logger.info(`Getting Bilibili audio for song "${data.value.name}" (id: ${id}, value: "${data.value.value}") ...`)
 
-    const audioSourceResult = await BiliFetcher.getAudioSource(data.value.value)
-    if (audioSourceResult.isNothing()) {
-      logger.error(`Failed to get Bilibili audio source for song ${id}`)
+    const audioFilePathResult = await BiliFetcher.getAudioFilePath(data.value.value)
+    if (audioFilePathResult.isNothing()) {
+      logger.error(`Failed to get Bilibili audio file for song ${id}`)
       return Left({
         type: 'application/json',
-        content: JSON.stringify({ error: 'Failed to get Bilibili audio source' }),
+        content: JSON.stringify({ error: 'Failed to get Bilibili audio file' }),
         code: 502
       })
     }
 
-    const audioSource = audioSourceResult.value
-    const proxyStreamResult = await BiliFetcher.fetchProxyStream(audioSource.url, meta.headers.range)
-    if (proxyStreamResult.isNothing()) {
-      logger.error(`Failed to fetch Bilibili audio stream for song ${id}`)
-      return Left({
-        type: 'application/json',
-        content: JSON.stringify({ error: 'Failed to proxy Bilibili audio stream' }),
-        code: 502
-      })
-    }
-
-    const proxyStream = proxyStreamResult.value
     return Right({
-      type: proxyStream.contentType,
-      stream: proxyStream.body,
-      code: proxyStream.status,
-      headers: proxyStream.headers
+      type: 'audio/mpeg',
+      path: audioFilePathResult.value,
+      headers: {
+        'Accept-Ranges': 'bytes'
+      }
     })
+  })
+
+export const getSettingsHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
+  logger.info('Getting settings')
+  return Right({ playlistId: CONFIG.playlistId, cacheMaxSize: CONFIG.cacheMaxSize })
+})
+
+export const setSettingsHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(settingsSchema)] as const)
+  .bind(async ([{ playlistId, cacheMaxSize }], { logger }) => {
+    try {
+      saveConfig({ playlistId, cacheMaxSize })
+      logger.info(`Updated settings: playlistId=${playlistId}, cacheMaxSize=${cacheMaxSize}`)
+      return Right({ playlistId, cacheMaxSize })
+    } catch (err) {
+      logger.error('Failed to save settings:', err)
+      return Left({ error: `Failed to save settings: ${stringifyCatchError(err)}` })
+    }
   })

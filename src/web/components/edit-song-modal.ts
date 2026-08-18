@@ -8,6 +8,7 @@ export const editSongModal = defineComponent(
   {
     isOpen: State(false),
     song: State<SongInfo | null>(null),
+    draft: State<SongInfo | null>(null),
     isLoading: State(false)
   },
   {
@@ -21,15 +22,20 @@ export const editSongModal = defineComponent(
     `,
     render: (host) => {
       if (!host.isOpen || !host.song) return html``
+      if (host.draft?.id !== host.song.id) host.draft = { ...host.song }
+      const draft = host.draft
 
       const handleClose = () => {
         if (host.isLoading) return
         host.isOpen = false
+        host.draft = null
         host.dispatchEvent(new CustomEvent('close'))
       }
 
       const handleSubmit = (): void => {
-        if (!host.song?.value?.trim() && host.song?.type !== 'netease') {
+        const current = host.draft
+        if (!current) return
+        if (!current.value?.trim() && current.type !== 'netease') {
           showToast('歌曲地址不能为空', 'error')
           return
         }
@@ -39,9 +45,9 @@ export const editSongModal = defineComponent(
         try {
           const event = new CustomEvent('edit-song-save', {
             detail: {
-              id: host.song.id,
-              source: host.song.type,
-              value: host.song.value.trim()
+              id: current.id,
+              source: current.type,
+              value: current.value.trim()
             },
             bubbles: true,
             composed: true
@@ -78,19 +84,19 @@ export const editSongModal = defineComponent(
 
             <div class="space-y-4">
               <div>
-                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">来源：<strong class="${host.song.id.length < 36 ? 'text-red' : 'text-[var(--lx-accent)]'}">${host.song.id.length < 36 ? '网易云' : '自定义'}</strong></span>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">来源：<strong class="${draft.id.length < 36 ? 'text-red' : 'text-[var(--lx-accent)]'}">${draft.id.length < 36 ? '网易云' : '自定义'}</strong></span>
               </div>
               <div>
-                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲名：<span class="select-all">${host.song.name}</span></span>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲名：<span class="select-all">${draft.name}</span></span>
               </div>
               <div>
-                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌手：<span class="select-all">${host.song.artists.join('、')}</span></span>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌手：<span class="select-all">${draft.artists.join('、')}</span></span>
               </div>
               ${
-                host.song.cover.trim()
+                draft.cover.trim()
                   ? html`
               <div>
-                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">封面：<a href="${host.song.cover}" target="_blank" class="select-text break-words">${host.song.cover}</a></span>
+                <span class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">封面：<a href="${draft.cover}" target="_blank" class="select-text break-words">${draft.cover}</a></span>
               </div>`
                   : ''
               }
@@ -98,10 +104,10 @@ export const editSongModal = defineComponent(
                 <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲源</label>
                 <select
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
-                  .value=${host.song.type}
+                  .value=${draft.type}
                   @change=${(e: Event) => {
                     const target = e.target as HTMLSelectElement
-                    if (host.song) host.song = { ...host.song, type: target.value as SongSourceType }
+                    host.draft = { ...draft, type: target.value as SongSourceType }
                   }}
                 >
                   <option value="netease">网易云音乐</option>
@@ -116,10 +122,10 @@ export const editSongModal = defineComponent(
                 <input
                   type="text"
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
-                  .value=${host.song.value}
+                  .value=${draft.value}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
-                    if (host.song) host.song = { ...host.song, value: target.value }
+                    host.draft = { ...draft, value: target.value }
                   }}
                 />
               </div>
@@ -135,7 +141,7 @@ export const editSongModal = defineComponent(
               <button
                 class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 @click=${handleSubmit}
-                ?disabled=${host.isLoading || (!host.song.value.trim() && host.song.type !== 'netease')}
+                ?disabled=${host.isLoading || (!draft.value.trim() && draft.type !== 'netease')}
               >
                 ${host.isLoading ? '保存中...' : '保存修改'}
               </button>

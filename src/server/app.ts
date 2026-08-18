@@ -2,15 +2,17 @@ import { existsSync } from 'node:fs'
 import { createApp } from '@/romi'
 import type { InferRouteToClientRoute } from '@/romi/client'
 import { appRoute } from './apis'
+import { pruneCache } from './cache'
 import { type AppState, CONFIG, logger, RUNTIME } from './common'
 import { Data } from './data'
-import { NeteaseFetcher } from './fetcher'
+import { NeteaseFetcher } from './fetchers/netease'
 
 export type AppRouter = InferRouteToClientRoute<typeof appRoute>
 
 export function bootstrap() {
   logger.info(`Loading data file at ${Data.PLAYLIST_DATA_FILE} ...`)
   NeteaseFetcher.init()
+  pruneCache(CONFIG.cacheMaxSize * 1024 * 1024)
   logger.info(`Current runtime: ${RUNTIME}`)
   if (existsSync(Data.COOKIES_DATA_FILE)) {
     logger.info(`${Data.COOKIES_DATA_FILE} is found.`)

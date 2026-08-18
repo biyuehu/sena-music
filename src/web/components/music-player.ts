@@ -109,14 +109,14 @@ defineComponent(
       audio.volume = host.volume
 
       const handlePlayError = (index: number, error?: string): void => {
-        const shouldAutoNext = host.playMode !== 'stop' && host.playMode !== 'single-loop'
+        const shouldAutoNext = host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
         if (error) console.error(`Failed to play song ${index}:`, error)
         if (shouldAutoNext) {
           showToast(error ? `播放错误：${error}，2秒后跳过...` : `资源失效，2秒后跳过...`, 'error')
           host.playErrorTimeout = setTimeout(() => {
-            if (host.currentIndex === index) {
+            if (host.currentIndex === index && host.isUserManuallyPlaying) {
               host.actions?.next(true)
             }
           }, 2000)
@@ -133,6 +133,7 @@ defineComponent(
             clearTimeout(host.playErrorTimeout)
             host.playErrorTimeout = null
           }
+          host.isUserManuallyPlaying = !onlyLoad
           audio.currentTime = 0
           audio.pause()
           host.currentIndex = index
@@ -158,10 +159,19 @@ defineComponent(
         toggle: (): void => {
           host.showVolumeBar = false
           if (host.currentIndex === -1) return void host.actions?.play(0)
+          if (host.playErrorTimeout !== null) {
+            clearTimeout(host.playErrorTimeout)
+            host.playErrorTimeout = null
+            host.isUserManuallyPlaying = false
+            host.isPlaying = false
+            return
+          }
           if (host.isPlaying) {
+            host.isUserManuallyPlaying = false
             audio.pause()
             host.isPlaying = false
           } else {
+            host.isUserManuallyPlaying = true
             audio
               .play()
               .then(() => {
@@ -173,6 +183,7 @@ defineComponent(
         next: (isAuto = false): void => {
           host.showVolumeBar = false
           if (isAuto && host.playMode === 'stop') return
+          if (!isAuto) host.isUserManuallyPlaying = true
           if (host.playMode === 'single-loop') {
             host.actions?.play(host.currentIndex)
             return
@@ -185,6 +196,7 @@ defineComponent(
         },
         prev: (): void => {
           host.showVolumeBar = false
+          host.isUserManuallyPlaying = true
           host.actions?.play((host.currentIndex - 1 + host.playlist.length) % host.playlist.length)
         },
         switchMode: (): void => {
@@ -315,6 +327,7 @@ defineComponent(
               Right: ({ playlist }) => {
                 host.playlist = playlist
                 showToast('更新成功', 'success')
+                if (host.playlist[host.currentIndex]?.id === e.detail.id) host.actions?.play(host.currentIndex)
               },
               Left: () => showToast('更新失败', 'error')
             })
@@ -463,21 +476,21 @@ defineComponent(
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
       <div class="flex-none flex items-center justify-end gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
-        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-accent)] text-white">
+        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center justify-center p-1.5 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity">
           <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
         </button>
-        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-[var(--lx-border)]">
+        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center justify-center p-1.5 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity">
           <div class="i-carbon-add"></div><span>添加歌曲</span>
         </button>
-        <button 
-          @click=${() => toggleTheme()} 
-          class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity" 
+        <button
+          @click=${() => toggleTheme()}
+          class="flex items-center justify-center p-1 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity"
           title="${host.isDark ? '切换至亮色模式' : '切换至暗色模式'}"
         >
           <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base"></div>
         </button>
       </div>
-      <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] bg-[var(--lx-bg-alt)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
+      <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
         <span>#</span>
         <span>歌曲名</span>
         <span>歌手</span>
@@ -505,7 +518,11 @@ defineComponent(
           `
               : host.playlist.map(
                   (item, index) => html`
-              <div @click=${() => host.actions?.play(index)} class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}">
+              <div
+                @click=${() => window.matchMedia('(pointer: coarse)').matches && host.actions?.play(index)}
+                @dblclick=${() => host.actions?.play(index)}
+                class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}"
+              >
                 <div class="flex items-center text-xs opacity-40">
                   <span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span>
                 </div>
@@ -535,11 +552,9 @@ defineComponent(
                   }
                   <button title="编辑源" @click=${(e: Event) => {
                     e.stopPropagation()
-                    // if (host.isPlaying && host.currentIndex === index) {
-                    //   showToast('播放中无法编辑当前歌曲')
-                    //   return
-                    // }
-                    host.isPlaying ? '播放中无法编辑歌曲' : host.actions?.openEditModal(item, e)
+                    host.isPlaying && host.currentIndex === index
+                      ? showToast('播放中无法编辑当前歌曲')
+                      : host.actions?.openEditModal(item, e)
                   }} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button>
                   <button title="删除" @click=${(e: Event) => {
                     e.stopPropagation()

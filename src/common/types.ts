@@ -55,3 +55,10 @@ export interface SetSongOrderRequest {
 export interface PlaylistResponse {
   playlist: Playlist
 }
+
+export const settingsSchema = z.object({
+  playlistId: z.number().int().positive(),
+  cacheMaxSize: z.number().nonnegative()
+})
+
+export type Settings = z.infer<typeof settingsSchema>

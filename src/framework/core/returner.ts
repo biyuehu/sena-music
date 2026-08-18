@@ -2,6 +2,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { Readable } from 'node:stream'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { stringify } from 'devalue'
 import sirv from 'sirv'
 import z from 'zod'
@@ -136,7 +137,7 @@ export class VirtualResourceReturner<
       if (data.stream instanceof Readable) {
         data.stream.pipe(resRaw)
       } else if (data.stream instanceof ReadableStream) {
-        Readable.fromWeb(data.stream).pipe(resRaw)
+        Readable.fromWeb(data.stream as unknown as NodeReadableStream<Uint8Array>).pipe(resRaw)
       }
       return
     }
