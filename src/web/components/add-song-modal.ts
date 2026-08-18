@@ -68,21 +68,19 @@ export const addSongModal = defineComponent(
         host.isLoading = true
 
         try {
-          const event = new CustomEvent('add-song', {
-            detail: {
-              name: host.form.name.trim(),
-              artists,
-              cover: host.form.cover.trim(),
-              type: host.form.type,
-              value: host.form.value.trim()
-            },
-            bubbles: true,
-            composed: true
-          })
-          host.dispatchEvent(event)
-
-          // 等待父组件处理完成，父组件会关闭模态框
-          // 这里不需要手动关闭，由父组件控制
+          host.dispatchEvent(
+            new CustomEvent('add-song', {
+              detail: {
+                name: host.form.name.trim(),
+                artists,
+                cover: host.form.cover.trim(),
+                type: host.form.type,
+                value: host.form.value.trim()
+              },
+              bubbles: true,
+              composed: true
+            })
+          )
         } catch (err) {
           console.error('Failed to add song:', err)
           showToast('添加失败，请检查地址', 'error')

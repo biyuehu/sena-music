@@ -1,3 +1,5 @@
-# TODO
+# Sena-Music
 
-- [ ] parcel 缓存build有问题对于模块感知
+## Fix
+
+- volume, playingmode  will removed automaticlly
