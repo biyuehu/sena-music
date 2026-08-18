@@ -1,18 +1,16 @@
-import { exec } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { promisify } from 'node:util'
 import { settingsSchema, songSourceTypeSchema } from 'src/common/types'
 import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
-import { type AppState, CONFIG, RUNTIME } from './common'
+import { type AppState, CONFIG } from './common'
 import { saveConfig } from './config'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
 import { BiliFetcher } from './fetchers/bilibili'
 import { NeteaseFetcher } from './fetchers/netease'
+import { YoutubeFetcher } from './fetchers/youtube'
 
 export const getPlaylistHandler = Action.empty<AppState>().bind(async (_data, { logger }) =>
   Data.load().match({
@@ -324,41 +322,55 @@ export const getLocalAudioFilesHandler = Action.empty<AppState>()
     })
   )
 
-export const getYoutubeAudioUrlHandler = Action.empty<AppState>()
-  .use([new BodyExtracter(z.object({ id: z.string() }))] as const)
+export const getYoutubeAudioFileHandler = Action.empty<AppState>()
+  .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
   .bind(async ([{ id }], { logger }) => {
     const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
     if (data.isLeft()) {
       logger.error('Failed to load playlist:', data.value)
-      return Left({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` })
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` }),
+        code: 500
+      })
     }
     if (data.value === void 0) {
       logger.warn(`Song with id ${id} not found`)
-      return Left({ error: `Song with id ${id} not found` })
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} not found` }),
+        code: 404
+      })
     }
 
     if (data.value.type !== 'youtube' || !data.value.value.trim()) {
       logger.warn(`Song with id ${id} is not a YouTube video`)
-      return Left({ error: `Song with id ${id} is not a YouTube video` })
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} is not a YouTube video` }),
+        code: 400
+      })
     }
 
-    try {
-      logger.info(`Getting YouTube audio URL for song with id ${id} ...`)
+    logger.info(`Getting YouTube audio for song "${data.value.name}" (id: ${id}, value: "${data.value.value}") ...`)
 
-      const { stdout, stderr } = await promisify(exec)(
-        `yt-dlp${existsSync(Data.COOKIES_DATA_FILE) ? ` --cookies "${Data.COOKIES_DATA_FILE}"` : ''} --js-runtimes ${RUNTIME} --remote-components ejs:github --extractor-args "youtube:player_client=web,web_embedded" -g -f bestaudio "${data.value.value}"`,
-        {
-          maxBuffer: 10 * 1024 * 1024
-        }
-      )
-
-      if (stderr) logger.warn('Warning from yt-dlp:', stderr.trim())
-      logger.info(`Got YouTube audio URL for song with id ${id}: ${stdout.trim()}`)
-      return Right({ url: stdout.trim() })
-    } catch (err) {
-      logger.error('Failed to get audio URL:', err)
-      return Left({ error: `Failed to get audio URL: ${stringifyCatchError(err)}` })
+    const audioFilePathResult = await YoutubeFetcher.getAudioFilePath(data.value.value)
+    if (audioFilePathResult.isNothing()) {
+      logger.error(`Failed to get YouTube audio file for song ${id}`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: 'Failed to get YouTube audio file' }),
+        code: 502
+      })
     }
+
+    return Right({
+      type: 'audio/mpeg',
+      path: audioFilePathResult.value,
+      headers: {
+        'Accept-Ranges': 'bytes'
+      }
+    })
   })
 
 export const getBiliAudioFileHandler = Action.empty<AppState>()

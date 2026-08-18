@@ -2,6 +2,36 @@ import { Cache } from './cache'
 
 export type Theme = 'light' | 'dark' | 'auto'
 
+export type ColorScheme = 'orange' | 'blue' | 'purple' | 'green' | 'pink'
+
+const COLOR_SCHEMES: Record<ColorScheme, { light: string; dark: string }> = {
+  orange: { light: '#f97316', dark: '#fb923c' },
+  blue: { light: '#3b82f6', dark: '#60a5fa' },
+  purple: { light: '#8b5cf6', dark: '#a78bfa' },
+  green: { light: '#10b981', dark: '#34d399' },
+  pink: { light: '#ec4899', dark: '#f472b6' }
+}
+
+export function getStoredColorScheme(): ColorScheme {
+  const cached = Cache.get<string>('color-scheme')
+  if (cached.isJust() && COLOR_SCHEMES[cached.value as ColorScheme]) {
+    return cached.value as ColorScheme
+  }
+  return 'orange'
+}
+
+export function applyColorScheme(scheme: ColorScheme): void {
+  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.orange
+  const effective = getEffectiveTheme()
+  const accent = effective === 'dark' ? colors.dark : colors.light
+  document.documentElement.style.setProperty('--lx-accent', accent)
+  Cache.set('color-scheme', scheme, 86400 * 365)
+}
+
+export function initColorScheme(): void {
+  applyColorScheme(getStoredColorScheme())
+}
+
 export function getSystemTheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light'
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -44,6 +74,11 @@ export function toggleTheme(): 'light' | 'dark' {
 export function initTheme(): void {
   const stored = getStoredTheme()
   applyTheme(stored)
+
+  const scheme = getStoredColorScheme()
+  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.orange
+  const effective = getEffectiveTheme()
+  document.documentElement.style.setProperty('--lx-accent', effective === 'dark' ? colors.dark : colors.light)
 
   if (typeof window !== 'undefined' && window.matchMedia) {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {

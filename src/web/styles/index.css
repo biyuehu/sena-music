@@ -7,6 +7,8 @@
   --lx-text-muted: #999;
   --lx-bg-alt: #f5f5f5;
   --lx-hover: #f0f0f0;
+  --lx-icon-filter: none;
+  --lx-icon-hover-filter: invert(45%) sepia(80%) saturate(1200%) hue-rotate(185deg);
 }
 
 html,
@@ -24,15 +26,63 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+[class^="i-"],
+[class*=" i-"] {
+  display: inline-block;
+  vertical-align: middle;
+  filter: var(--lx-icon-filter, none);
+  transition:
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.text-white [class^="i-"],
+.text-white [class*=" i-"],
+.text-white[class^="i-"],
+.text-white[class*=" i-"],
+.text-white button [class^="i-"],
+.text-white button [class*=" i-"] {
+  filter: invert(1) brightness(2) !important;
+}
+
+[class*="text-[var(--lx-accent)]"] [class^="i-"],
+[class*="text-[var(--lx-accent)]"] [class*=" i-"] {
+  filter: var(--lx-icon-hover-filter) !important;
+}
+
+button:hover > [class^="i-"],
+button:hover > [class*=" i-"],
+[class^="i-"]:hover,
+[class*=" i-"]:hover {
+  filter: var(--lx-icon-hover-filter);
+}
+
+.text-white:hover > [class^="i-"],
+.text-white:hover > [class*=" i-"],
+button.text-white:hover > [class^="i-"],
+button.text-white:hover > [class*=" i-"],
+button.text-white:hover [class^="i-"],
+button.text-white:hover [class*=" i-"] {
+  filter: invert(1) brightness(2) !important;
+}
+
+button:hover > .i-carbon-trash-can,
+.i-carbon-trash-can:hover {
+  filter: invert(40%) sepia(90%) saturate(2500%) hue-rotate(335deg) brightness(1.1) !important;
+}
+
 :root.dark,
 html.dark {
   color-scheme: dark;
-  --lx-main: #202022;
-  --lx-border: #333;
-  --lx-text: #ccc;
-  --lx-text-muted: #666;
-  --lx-bg-alt: #1a1a1c;
-  --lx-hover: #2a2a2e;
+  --lx-main: #1e1e20;
+  --lx-border: #38383c;
+  --lx-accent: #60a5fa;
+  --lx-text: #e4e4e7;
+  --lx-text-muted: #9ca3af;
+  --lx-bg-alt: #161618;
+  --lx-hover: #2d2d32;
+  --lx-icon-filter: invert(0.88) brightness(1.1);
+  --lx-icon-hover-filter: invert(65%) sepia(60%) saturate(2000%) hue-rotate(185deg) brightness(1.2);
 }
 
 ::-webkit-scrollbar {
@@ -72,6 +122,38 @@ input:focus,
 select:focus {
   border-color: var(--lx-accent);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  background: var(--lx-border);
+  border-radius: 999px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--lx-accent);
+}
+
+input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
 }
 
 input[type="range"] {

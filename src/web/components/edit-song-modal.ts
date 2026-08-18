@@ -74,7 +74,7 @@ export const editSongModal = defineComponent(
             <div class="flex justify-between items-center mb-5">
               <div class="text-lg font-semibold text-[var(--lx-text)]">编辑歌曲</div>
               <button 
-                class="p-1 rounded hover:bg-[var(--lx-border)] text-[var(--lx-text-muted)]"
+                class="p-1 rounded hover:bg-[var(--lx-hover)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)] transition-colors"
                 @click=${handleClose}
                 ?disabled=${host.isLoading}
               >
@@ -132,7 +132,7 @@ export const editSongModal = defineComponent(
             </div>
             <div class="flex gap-3 mt-8">
               <button
-                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-90"
+                class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
                 @click=${handleClose}
                 ?disabled=${host.isLoading}
               >

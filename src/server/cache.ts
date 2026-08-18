@@ -6,7 +6,19 @@ import { Data } from './data'
 export function pruneCache(maxSizeBytes: number): void {
   if (!existsSync(Data.CACHE_DIRECTORY)) return
 
-  const entries = readdirSync(Data.CACHE_DIRECTORY)
+  const allFiles = readdirSync(Data.CACHE_DIRECTORY)
+
+  // 清理残留的 .lock 文件
+  for (const name of allFiles) {
+    if (name.endsWith('.lock')) {
+      const lockPath = join(Data.CACHE_DIRECTORY, name)
+      unlinkSync(lockPath)
+      logger.warn(`Removed stale lock file: ${lockPath}`)
+    }
+  }
+
+  const entries = allFiles
+    .filter((name) => !name.endsWith('.lock'))
     .map((name) => {
       const filePath = join(Data.CACHE_DIRECTORY, name)
       const stat = statSync(filePath)

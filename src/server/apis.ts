@@ -17,7 +17,7 @@ import {
   getLocalAudioFilesHandler,
   getPlaylistHandler,
   getSettingsHandler,
-  getYoutubeAudioUrlHandler,
+  getYoutubeAudioFileHandler,
   removeSongHandler,
   setSettingsHandler,
   setSongOrderHandler,
@@ -82,11 +82,11 @@ const getBiliAudioFile = Api.new(
   new VirtualResourceReturner()
 )
 
-const getYoutubeAudioUrl = Api.new(
-  getYoutubeAudioUrlHandler,
-  z.object({ url: z.string() }),
-  standardJsonReturnErrorSchema,
-  new JsonRetutner()
+const getYoutubeAudioFile = Api.new(
+  getYoutubeAudioFileHandler,
+  virtualResourceReturnSchema,
+  virtualResourceReturnSchema,
+  new VirtualResourceReturner()
 )
 
 const getSettings = Api.new(getSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonRetutner())
@@ -123,7 +123,7 @@ export const appRoute = {
   sync,
   getLocalAudioFiles,
   getBiliAudioFile,
-  getYoutubeAudioUrl,
+  getYoutubeAudioFile,
   getSettings,
   setSettings,
   [any]: assets

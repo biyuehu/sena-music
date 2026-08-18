@@ -5,7 +5,16 @@ import type { Settings } from 'src/common/types'
 import { defineComponent, State } from '@/romi/web'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
-import { getEffectiveTheme, initTheme, toggleTheme } from '../theme'
+import {
+  applyColorScheme,
+  applyTheme,
+  type ColorScheme,
+  getEffectiveTheme,
+  getStoredColorScheme,
+  getStoredTheme,
+  initTheme,
+  type Theme
+} from '../theme'
 import { showToast } from './toast'
 
 defineComponent(
@@ -17,7 +26,10 @@ defineComponent(
     cacheMaxSize: State(0),
     apiBaseUrl: State(''),
     initial: State<Settings>({ playlistId: 0, cacheMaxSize: 0 }),
-    isDark: State(getEffectiveTheme() === 'dark')
+    isDark: State(getEffectiveTheme() === 'dark'),
+    autoNextOnError: State(true),
+    colorScheme: State<ColorScheme>('orange'),
+    theme: State<Theme>('auto')
   },
   {
     useGlobalStyles: true,
@@ -33,6 +45,9 @@ defineComponent(
     connectedCallback: (host): (() => void) => {
       initTheme()
       host.apiBaseUrl = Cache.get<string>('api-base-url').unwrapOr('')
+      host.autoNextOnError = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
+      host.colorScheme = getStoredColorScheme()
+      host.theme = getStoredTheme()
 
       httpClient
         .getSettings()
@@ -51,7 +66,9 @@ defineComponent(
         })
 
       const handleThemeChange = (e: Event): void => {
-        host.isDark = (e as CustomEvent<{ effective: 'light' | 'dark' }>).detail.effective === 'dark'
+        const detail = (e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>).detail
+        host.isDark = detail.effective === 'dark'
+        host.theme = detail.theme as Theme
       }
       document.addEventListener('theme-change', handleThemeChange)
       return () => document.removeEventListener('theme-change', handleThemeChange)
@@ -79,17 +96,35 @@ defineComponent(
           })
       }
 
+      const themeOptions: Array<{ value: Theme; label: string }> = [
+        { value: 'light', label: '亮色' },
+        { value: 'dark', label: '暗色' },
+        { value: 'auto', label: '跟随系统' }
+      ]
+
+      const colorOptions: Array<{ value: ColorScheme; label: string }> = [
+        { value: 'orange', label: '橙色' },
+        { value: 'blue', label: '蓝色' },
+        { value: 'purple', label: '紫色' },
+        { value: 'green', label: '绿色' },
+        { value: 'pink', label: '粉色' }
+      ]
+
       return html`
         <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
           <main class="flex-1 flex flex-col min-w-0 min-h-0">
             <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
               <span class="font-bold text-sm">设置</span>
               <button
-                @click=${() => toggleTheme()}
-                class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity"
-                title="${host.isDark ? '切换至亮色模式' : '切换至暗色模式'}"
+                @click=${() => {
+                  const modes: Theme[] = ['light', 'dark', 'auto']
+                  const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
+                  applyTheme(next)
+                }}
+                class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors"
+                title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
               >
-                <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base"></div>
+                <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
               </button>
             </div>
 
@@ -138,6 +173,55 @@ defineComponent(
                         <div class="i-carbon-save ${host.saving ? 'animate-pulse' : ''}"></div>
                         <span>${host.saving ? '保存中...' : '保存设置'}</span>
                       </button>
+
+                      <div class="border-t border-[var(--lx-border)] pt-5">
+                        <span class="text-xs font-bold opacity-50 uppercase tracking-wider">外观与播放</span>
+                      </div>
+
+                      <label class="flex items-center justify-between gap-3">
+                        <span class="text-xs font-bold opacity-70">播放失败时自动切换到下一首</span>
+                        <input
+                          type="checkbox"
+                          class="w-4 h-4"
+                          .checked=${host.autoNextOnError}
+                          @change=${(e: Event) => {
+                            host.autoNextOnError = (e.target as HTMLInputElement).checked
+                            Cache.set('auto-next-on-error', host.autoNextOnError, 86400 * 365)
+                          }}
+                        />
+                      </label>
+
+                      <label class="flex flex-col gap-1.5">
+                        <span class="text-xs font-bold opacity-70">主题</span>
+                        <select
+                          @change=${(e: Event) => {
+                            const value = (e.target as HTMLSelectElement).value as Theme
+                            host.theme = value
+                            applyTheme(value)
+                          }}
+                        >
+                          ${themeOptions.map(
+                            (opt) =>
+                              html`<option value=${opt.value} ?selected=${host.theme === opt.value}>${opt.label}</option>`
+                          )}
+                        </select>
+                      </label>
+
+                      <label class="flex flex-col gap-1.5">
+                        <span class="text-xs font-bold opacity-70">配色方案</span>
+                        <select
+                          @change=${(e: Event) => {
+                            const value = (e.target as HTMLSelectElement).value as ColorScheme
+                            host.colorScheme = value
+                            applyColorScheme(value)
+                          }}
+                        >
+                          ${colorOptions.map(
+                            (opt) =>
+                              html`<option value=${opt.value} ?selected=${host.colorScheme === opt.value}>${opt.label}</option>`
+                          )}
+                        </select>
+                      </label>
                     </div>
                   `
               }

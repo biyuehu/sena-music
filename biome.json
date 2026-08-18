@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist"]
+    "includes": ["**", "!!**/dist", "!!uno.css"]
   },
   "formatter": {
     "enabled": true,
@@ -24,6 +24,12 @@
         "useConsistentArrowReturn": "warn",
         "noUselessElse": "warn",
         "useShorthandAssign": "warn"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
+      },
+      "suspicious": {
+        "noUnknownAtRules": "off"
       }
     }
   },

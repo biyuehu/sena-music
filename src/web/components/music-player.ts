@@ -9,7 +9,7 @@ import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
-import { getEffectiveTheme, initTheme, toggleTheme } from '../theme'
+import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
 
@@ -58,7 +58,9 @@ defineComponent(
     playErrorTimeout: Ref<NodeJS.Timeout | null>(null),
     isUserManuallyPlaying: Ref<boolean>(false),
     coverErrorMap: State<Record<string, boolean>>({}),
-    isDark: State(getEffectiveTheme() === 'dark')
+    isDark: State(getEffectiveTheme() === 'dark'),
+    searchTerm: State<string>(''),
+    theme: State<Theme>('auto')
   },
   {
     useGlobalStyles: true,
@@ -109,7 +111,9 @@ defineComponent(
       audio.volume = host.volume
 
       const handlePlayError = (index: number, error?: string): void => {
-        const shouldAutoNext = host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
+        const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
+        const shouldAutoNext =
+          autoNextEnabled && host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
         if (error) console.error(`Failed to play song ${index}:`, error)
@@ -341,9 +345,11 @@ defineComponent(
       document.addEventListener('edit-song-save', handleEdit)
 
       initTheme()
+      host.theme = getStoredTheme()
       const handleThemeChange = (e: Event) => {
         const customEvent = e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>
         host.isDark = customEvent.detail.effective === 'dark'
+        host.theme = customEvent.detail.theme as Theme
       }
       document.addEventListener('theme-change', handleThemeChange)
 
@@ -375,6 +381,15 @@ defineComponent(
         'single-loop': '单曲循环',
         stop: '停止播放'
       }
+
+      const filteredPlaylist = host.playlist
+        .map((item, originalIndex) => ({ item, originalIndex }))
+        .filter(
+          ({ item }) =>
+            !host.searchTerm ||
+            item.name.toLowerCase().includes(host.searchTerm.toLowerCase()) ||
+            item.artists.some((artist) => artist.toLowerCase().includes(host.searchTerm.toLowerCase()))
+        )
 
       const renderCover = (url?: string, className = '') => {
         const isBadCover = url ? host.coverErrorMap[url] : true
@@ -475,20 +490,40 @@ defineComponent(
       return html`
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
-      <div class="flex-none flex items-center justify-end gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
-        <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center justify-center p-1.5 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity">
-          <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
-        </button>
-        <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center justify-center p-1.5 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity">
-          <div class="i-carbon-add"></div><span>添加歌曲</span>
-        </button>
-        <button
-          @click=${() => toggleTheme()}
-          class="flex items-center justify-center p-1 rounded text-sm bg-[var(--lx-border)] text-[var(--lx-text)] hover:opacity-80 transition-opacity"
-          title="${host.isDark ? '切换至亮色模式' : '切换至暗色模式'}"
-        >
-          <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base"></div>
-        </button>
+      <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
+        <div class="relative flex-1 max-w-sm min-w-[200px] hidden xl:block mr-auto">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--lx-text-muted)]">
+            <div class="i-carbon-search"></div>
+          </div>
+          <input
+            type="text"
+            .value=${host.searchTerm}
+            @input=${(e: Event) => {
+              host.searchTerm = (e.target as HTMLInputElement).value
+            }}
+            placeholder="搜索歌曲或歌手..."
+            class="w-full pl-9 pr-3 py-1.5 bg-[var(--lx-hover)] border border-[var(--lx-border)] rounded-full text-sm text-[var(--lx-text)] focus:outline-none focus:border-[var(--lx-accent)] transition-colors"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 p-1.5 rounded text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 transition-opacity font-medium">
+            <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
+          </button>
+          <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 p-1.5 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors">
+            <div class="i-carbon-add"></div><span>添加歌曲</span>
+          </button>
+          <button
+            @click=${() => {
+              const modes: Theme[] = ['light', 'dark', 'auto']
+              const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
+              applyTheme(next)
+            }}
+            class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors"
+            title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
+          >
+            <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
+          </button>
+        </div>
       </div>
       <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">
         <span>#</span>
@@ -506,53 +541,53 @@ defineComponent(
               <span class="text-sm">加载中...</span>
             </div>
           `
-            : host.playlist.length === 0
+            : filteredPlaylist.length === 0
               ? html`
             <div class="flex flex-col items-center justify-center h-full gap-4 opacity-30">
               <div class="i-carbon-music text-5xl"></div>
               <div class="text-center">
-                <div class="text-sm font-medium">还没有歌曲</div>
-                <div class="text-xs mt-1 opacity-70">同步歌单或手动添加歌曲</div>
+                <div class="text-sm font-medium">${host.playlist.length === 0 ? '还没有歌曲' : '没有找到匹配的歌曲'}</div>
+                <div class="text-xs mt-1 opacity-70">${host.playlist.length === 0 ? '同步歌单或手动添加歌曲' : '尝试其他搜索词'}</div>
               </div>
             </div>
           `
-              : host.playlist.map(
-                  (item, index) => html`
+              : filteredPlaylist.map(
+                  ({ item, originalIndex }) => html`
               <div
-                @click=${() => window.matchMedia('(pointer: coarse)').matches && host.actions?.play(index)}
-                @dblclick=${() => host.actions?.play(index)}
-                class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === index ? 'text-[var(--lx-accent)]' : ''}"
+                @click=${() => window.matchMedia('(pointer: coarse)').matches && host.actions?.play(originalIndex)}
+                @dblclick=${() => host.actions?.play(originalIndex)}
+                class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === originalIndex ? 'text-[var(--lx-accent)]' : ''}"
               >
                 <div class="flex items-center text-xs opacity-40">
-                  <span class="font-mono">${(index + 1).toString().padStart(2, '0')}</span>
+                  <span class="font-mono">${(originalIndex + 1).toString().padStart(2, '0')}</span>
                 </div>
                 <div class="truncate pr-4 font-medium">${item.name}</div>
                 <div class="truncate text-xs opacity-60">${item.artists.join(' & ')}</div>
                 <div class="hidden md:block text-[9px] border border-[var(--lx-border)] px-1 rounded uppercase opacity-40 w-fit">${item.type}</div>
                 <div class="absolute right-0 top-0 bottom-0 flex justify-end items-center pr-4 bg-gradient-to-l from-[var(--lx-hover)] via-[var(--lx-hover)] to-transparent opacity-0 group-hover:opacity-100 md:static md:bg-none md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   ${
-                    index === 0
+                    originalIndex === 0 || host.searchTerm
                       ? ''
                       : html`<button title="向上" @click=${(e: Event) => {
                           e.stopPropagation()
                           host.isPlaying
                             ? showToast('播放中无法调整歌曲')
-                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index - 0.5))
+                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (originalIndex - 0.5))
                         }} class="ml-1 i-carbon-arrow-up hover:text-[var(--lx-accent)]"></button>`
                   }
                   ${
-                    index === host.playlist.length - 1
+                    originalIndex === host.playlist.length - 1 || host.searchTerm
                       ? ''
                       : html`<button title="向下" @click=${(e: Event) => {
                           e.stopPropagation()
                           host.isPlaying
                             ? showToast('播放中无法调整歌曲')
-                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (index + 1.5))
+                            : host.actions?.updateSongOrder(item.id, PLAYLIST_SONG_ORDER_GAP * (originalIndex + 1.5))
                         }} class="ml-1 i-carbon-arrow-down hover:text-[var(--lx-accent)]"></button>`
                   }
                   <button title="编辑源" @click=${(e: Event) => {
                     e.stopPropagation()
-                    host.isPlaying && host.currentIndex === index
+                    host.isPlaying && host.currentIndex === originalIndex
                       ? showToast('播放中无法编辑当前歌曲')
                       : host.actions?.openEditModal(item, e)
                   }} class="i-carbon-edit hover:text-[var(--lx-accent)]"></button>

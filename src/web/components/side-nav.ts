@@ -1,6 +1,7 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import { getEffectiveTheme, initTheme, toggleTheme } from '../theme'
+import packageJson from '../../../package.json'
+import { getEffectiveTheme, initTheme } from '../theme'
 
 const activeItem = location.pathname.endsWith('settings.html') ? 'settings' : 'playlist'
 
@@ -23,6 +24,17 @@ export const sideNav = defineComponent(
       }
       @media (max-width: 767px) {
         :host { width: 0; }
+      }
+      [class^="i-"],
+      [class*=" i-"] {
+        display: inline-block;
+        vertical-align: middle;
+        filter: var(--lx-icon-filter, none);
+        transition: filter 0.2s ease, opacity 0.2s ease;
+      }
+      .text-white [class^="i-"],
+      .text-white [class*=" i-"] {
+        filter: invert(1) brightness(2) !important;
       }
     `,
     connectedCallback: (host) => {
@@ -79,7 +91,6 @@ export const sideNav = defineComponent(
             <span class="font-bold text-sm tracking-tight truncate">Sena Music</span>
           </div>
         </div>
-
         <div class="flex-1 px-2 space-y-1">
           <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
                @click=${() => (window.location.href = 'index.html')}>
@@ -94,19 +105,15 @@ export const sideNav = defineComponent(
         </div>
 
         <div class="p-3 border-t border-[var(--lx-border)]">
-          <button
-            class="flex items-center justify-between px-3 py-2 rounded text-sm cursor-pointer w-full opacity-70 hover:opacity-100 hover:bg-[var(--lx-hover)] transition-colors text-[var(--lx-text)]"
-            @click=${() => toggleTheme()}
-            title="切换暗色/亮色模式"
+          <a
+            href="https://github.com/biyuehu/sena-music"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer w-full opacity-80 hover:opacity-100 hover:bg-[var(--lx-hover)] transition-colors text-[var(--lx-text)]"
           >
-            <div class="flex items-center gap-2.5">
-              <div class="${host.isDark ? 'i-carbon-moon' : 'i-carbon-sun'} text-base shrink-0"></div>
-              <span class="text-xs font-medium">${host.isDark ? '暗色模式' : '亮色模式'}</span>
-            </div>
-            <div class="text-[10px] px-1.5 py-0.5 rounded border border-[var(--lx-border)] opacity-60 font-mono">
-              ${host.isDark ? 'DARK' : 'LIGHT'}
-            </div>
-          </button>
+            <div class="i-carbon-logo-github text-base shrink-0"></div>
+            <span class="text-xs font-medium">v${packageJson.version}</span>
+          </a>
         </div>
       </nav>
     `
