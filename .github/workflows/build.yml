@@ -3,8 +3,26 @@ name: Build
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'music.toml'
+      - 'tsconfig.json'
+      - 'biome.json'
+      - 'uno.config.ts'
+      - '.postcssrc.json'
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'music.toml'
+      - 'tsconfig.json'
+      - 'biome.json'
+      - 'uno.config.ts'
+      - '.postcssrc.json'
 
 jobs:
   build:
