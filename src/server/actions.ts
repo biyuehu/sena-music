@@ -55,7 +55,7 @@ export const setSongSourceHandler = Action.empty<AppState>()
         }
       },
       Left: (err) => {
-        logger.error("Failed to load pla'ylist:", err)
+        logger.error('Failed to load playlist:', err)
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
