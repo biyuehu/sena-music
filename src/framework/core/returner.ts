@@ -9,17 +9,17 @@ import z from 'zod'
 import type { Either } from '@/romi/utils/adt/either'
 import { pipe } from '@/romi/utils/fp'
 
-export abstract class Retutner<Right, Left> {
+export abstract class Returner<Right, Left> {
   protected declare abstract readonly brand: string
 
   public abstract return(result: Either<Left, Right>, reqRaw: IncomingMessage, resRaw: ServerResponse): void
 }
 
-export class JsonRetutner<R extends [number, object] | object, L extends [number, object] | object> extends Retutner<
+export class JsonReturner<R extends [number, object] | object, L extends [number, object] | object> extends Returner<
   R,
   L
 > {
-  protected declare readonly brand: 'JsonRetutner'
+  protected declare readonly brand: 'JsonReturner'
 
   protected format(ok: boolean, value: unknown) {
     return pipe(ok ? { ok: true, data: value } : { ok: false, error: value }, (json) => stringify(json))
@@ -61,7 +61,7 @@ export const standardJsonReturnErrorSchema = z.object({
   error: z.string()
 })
 
-export class TextReturner<R extends string, L extends string> extends Retutner<R, L> {
+export class TextReturner<R extends string, L extends string> extends Returner<R, L> {
   protected declare readonly brand: 'TextReturner'
 
   public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
@@ -103,7 +103,7 @@ export const virtualResourceReturnSchema = z.union([
 export class VirtualResourceReturner<
   R extends z.infer<typeof virtualResourceReturnSchema>,
   L extends z.infer<typeof virtualResourceReturnSchema>
-> extends Retutner<R, L> {
+> extends Returner<R, L> {
   protected declare readonly brand: 'VirtualResourceReturner'
 
   public override return(result: Either<L, R>, _reqRaw: IncomingMessage, resRaw: ServerResponse): void {
@@ -161,7 +161,7 @@ export class VirtualResourceReturner<
   }
 }
 
-export class AssetsReturner extends Retutner<object, never> {
+export class AssetsReturner extends Returner<object, never> {
   protected declare readonly brand: 'SirvReturner'
   private readonly handlers: ReturnType<typeof sirv>[]
 
