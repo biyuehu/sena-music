@@ -5,16 +5,16 @@ import { pipe } from '@/romi/utils/fp'
 import type { Known, StrictEmptyObject } from '@/romi/utils/types'
 import type { Action } from './action'
 import type { Extracter } from './extracter'
-import { JsonRetutner, type Retutner } from './returner'
+import { JsonReturner, type Returner } from './returner'
 
 export const any = Symbol('any-routers')
 
 export interface DataRouteWith<State extends object> {
-  [key: string]: Api<Known, z.ZodType, z.ZodType, Retutner<unknown, unknown>, State> | DataRouteWith<State>
+  [key: string]: Api<Known, z.ZodType, z.ZodType, Returner<unknown, unknown>, State> | DataRouteWith<State>
 }
 
 export type RouteWith<State extends object> = DataRouteWith<State> & {
-  [any]?: Api<Known, z.ZodType, z.ZodType, Retutner<unknown, unknown>, State>
+  [any]?: Api<Known, z.ZodType, z.ZodType, Returner<unknown, unknown>, State>
 }
 
 export type Route = RouteWith<StrictEmptyObject>
@@ -23,21 +23,21 @@ export class Api<
   Extracters extends Extracter<unknown>[],
   SuccessScheme extends z.ZodType,
   ErrorScheme extends z.ZodType,
-  Returner extends Retutner<z.infer<SuccessScheme>, z.infer<ErrorScheme>>,
+  ReturnerT extends Returner<z.infer<SuccessScheme>, z.infer<ErrorScheme>>,
   StartState extends object = object
 > {
   public static new<
     Extracters extends Extracter<unknown>[],
     SuccessScheme extends z.ZodType,
     ErrorScheme extends z.ZodType,
-    Returner extends Retutner<z.infer<SuccessScheme>, z.infer<ErrorScheme>>,
+    ReturnerT extends Returner<z.infer<SuccessScheme>, z.infer<ErrorScheme>>,
     StartState extends object = object
   >(
     action: Action<Extracters, z.infer<SuccessScheme>, z.infer<ErrorScheme>, Known, StartState>,
     successScheme: SuccessScheme,
     errorScheme: ErrorScheme,
-    returner: Returner
-  ): Api<Extracters, SuccessScheme, ErrorScheme, Returner, StartState> {
+    returner: ReturnerT
+  ): Api<Extracters, SuccessScheme, ErrorScheme, ReturnerT, StartState> {
     return new Api(action, successScheme, errorScheme, returner) as Known
   }
 
@@ -45,7 +45,7 @@ export class Api<
     private readonly action: Action<Extracters, z.infer<SuccessScheme>, z.infer<ErrorScheme>, Known, StartState>,
     protected readonly successScheme: SuccessScheme,
     protected readonly errorScheme: ErrorScheme,
-    private readonly returner: Returner
+    private readonly returner: ReturnerT
   ) {}
 
   public async run(reqRaw: IncomingMessage, resRaw: ServerResponse, initialState: StartState): Promise<void> {
@@ -54,7 +54,7 @@ export class Api<
       const errors = datas.filter((data) => data.isLeft()).map((data) => data.value)
 
       if (errors.length > 0) {
-        if (this.returner instanceof JsonRetutner) {
+        if (this.returner instanceof JsonReturner) {
           resRaw.end(
             this.returner.return(Left(`Body data invalid: ${errors.map((e) => e.message).join(', ')}`), reqRaw, resRaw)
           )
@@ -85,7 +85,7 @@ export class Api<
     } catch (e) {
       resRaw.statusCode = 500
       console.error('Exception in server', e)
-      if (this.returner instanceof JsonRetutner) {
+      if (this.returner instanceof JsonReturner) {
         resRaw.end(this.returner.return(Left([500, 'Internal Server Error']), reqRaw, resRaw))
       } else {
         resRaw.end()

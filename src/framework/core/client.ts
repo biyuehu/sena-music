@@ -4,7 +4,7 @@ import { type Either, Left, Right } from '@/romi/utils/adt/either'
 import type { EmptyObject, Known } from '@/romi/utils/types'
 import type { Api, Route, RouteWith } from './api'
 import type { BodyExtracter, Extracter, QueryExtracter } from './extracter'
-import type { JsonRetutner } from './returner'
+import type { JsonReturner } from './returner'
 
 export type ClientRoute = Record<
   string,
@@ -24,7 +24,7 @@ export type InferExtractersToRequestData<Extracters extends Extracter<unknown>[]
 // export type InferRouteToClientRoute<R extends RouteWith<Known>> = {
 //   [K in keyof R as R[K] extends Api<infer _, infer _, infer _, infer Returner>
 //     ? Returner extends
-//         | JsonRetutner<infer _, infer _>
+//         | JsonReturner<infer _, infer _>
 //         | TextReturner<string, string>
 //         | VirtualResourceReturner<infer _, infer _>
 //       ? K
@@ -45,7 +45,7 @@ export type InferExtractersToRequestData<Extracters extends Extracter<unknown>[]
 
 export type InferRouteToClientRoute<R extends RouteWith<Known>> = {
   [K in keyof R as R[K] extends Api<infer _, infer __, infer ___, infer Returner>
-    ? Returner extends JsonRetutner<infer _, infer __>
+    ? Returner extends JsonReturner<infer _, infer __>
       ? K
       : never
     : K]: R[K] extends Api<

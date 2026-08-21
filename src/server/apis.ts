@@ -5,7 +5,7 @@ import {
   Api,
   AssetsReturner,
   any,
-  JsonRetutner,
+  JsonReturner,
   type RouteWith,
   standardJsonReturnErrorSchema,
   VirtualResourceReturner,
@@ -32,42 +32,42 @@ const getPlaylist = Api.new(
   getPlaylistHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const setSongSource = Api.new(
   setSongSourceHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const addSong = Api.new(
   addSongHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const setSongOrder = Api.new(
   setSongOrderHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const removeSong = Api.new(
   removeSongHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const sync = Api.new(
   syncHandler,
   z.object({ playlist: playListSchema }),
   standardJsonReturnErrorSchema,
-  new JsonRetutner()
+  new JsonReturner()
 )
 
 const getLocalAudioFiles = Api.new(
@@ -91,13 +91,13 @@ const getYoutubeAudioFile = Api.new(
   new VirtualResourceReturner()
 )
 
-const getSettings = Api.new(getSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+const getSettings = Api.new(getSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonReturner())
 
-const setSettings = Api.new(setSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+const setSettings = Api.new(setSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonReturner())
 
-const getCacheInfo = Api.new(getCacheInfoHandler, cacheInfoSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+const getCacheInfo = Api.new(getCacheInfoHandler, cacheInfoSchema, standardJsonReturnErrorSchema, new JsonReturner())
 
-const cleanCache = Api.new(cleanCacheHandler, cacheInfoSchema, standardJsonReturnErrorSchema, new JsonRetutner())
+const cleanCache = Api.new(cleanCacheHandler, cacheInfoSchema, standardJsonReturnErrorSchema, new JsonReturner())
 
 const assets = Api.new(
   Action.empty(),
