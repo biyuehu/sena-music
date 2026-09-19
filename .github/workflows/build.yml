@@ -3,26 +3,21 @@ name: Build
 on:
   push:
     branches: [main]
-    paths:
+    paths: &paths
       - 'src/**'
+      - 'scripts/**'
+      - 'android/**'
       - 'package.json'
       - 'bun.lock'
       - 'music.toml'
       - 'tsconfig.json'
       - 'biome.json'
       - 'uno.config.ts'
+      - 'capacitor.config.ts'
       - '.postcssrc.json'
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'bun.lock'
-      - 'music.toml'
-      - 'tsconfig.json'
-      - 'biome.json'
-      - 'uno.config.ts'
-      - '.postcssrc.json'
+    paths: *paths
 
 jobs:
   build:
@@ -45,3 +40,92 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  web:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build web
+        run: bun run build
+
+      - name: Build server
+        run: bun run server:build
+
+      - name: Upload web
+        uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: dist/web
+
+  desktop:
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build desktop
+        run: bun run desktop:build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: release/*.exe
+
+  android:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Sync web assets
+        run: bun run mobile:sync
+
+      - name: Build APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug
+          path: android/app/build/outputs/apk/debug/*.apk

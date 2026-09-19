@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import z from 'zod'
 import {
   Action,
@@ -97,10 +99,16 @@ const assets = Api.new(
   Action.empty(),
   z.object(),
   z.never(),
-  new AssetsReturner([process.env.SENA_ASSETS_DIR ?? 'dist/web', 'public'], async (reqRaw, resRaw) => {
-    resRaw.statusCode = 404
-    resRaw.setHeader('Content-Type', 'text/html')
-    resRaw.end(/* html */ `
+  new AssetsReturner(
+    [
+      process.env.SENA_ASSETS_DIR ??
+        (existsSync(join(import.meta.dirname, 'static')) ? join(import.meta.dirname, 'static') : 'dist/client'),
+      'public'
+    ],
+    async (reqRaw, resRaw) => {
+      resRaw.statusCode = 404
+      resRaw.setHeader('Content-Type', 'text/html')
+      resRaw.end(/* html */ `
       <html>
         <head>
           <title>404 Not Found</title>
@@ -111,7 +119,8 @@ const assets = Api.new(
         </body>
       </html>
       `)
-  })
+    }
+  )
 )
 
 export const appRoute = {
