@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist", "!!uno.css"]
+    "includes": ["**", "!!**/dist", "!!uno.css", "!!**/*.lock"]
   },
   "formatter": {
     "enabled": true,
