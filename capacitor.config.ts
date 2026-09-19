@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 export default {
-  appId: 'com.himeno-sena.music',
+  appId: 'com.himenosena.music',
   appName: 'Sena Music',
-  webDir: 'dist/web'
+  webDir: 'dist/web',
+  server: { cleartext: true }
 } satisfies CapacitorConfig

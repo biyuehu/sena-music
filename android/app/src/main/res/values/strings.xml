@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sena Music</string>
+    <string name="title_activity_main">Sena Music</string>
+    <string name="package_name">com.himenosena.music</string>
+    <string name="custom_url_scheme">com.himenosena.music</string>
+</resources>

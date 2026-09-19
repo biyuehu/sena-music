@@ -1,6 +1,6 @@
 {
   "name": "sena-music",
-  "description": "",
+  "description": "A lightweight self-hosted music player that aggregates songs from multiple sources into a unified playlist.",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -16,6 +16,7 @@
     "desktop:dev:app": "bun scripts/build-desktop.ts --watch && electronmon dist/desktop/main.js",
     "desktop:dev": "concurrently -n client,main,app -c red,blue,green \"bun run dev:client\" \"bun run desktop:dev:main\" \"bun run desktop:dev:app\"",
     "desktop:build": "bun run build && bun scripts/build-desktop.ts && electron-builder",
+    "mobile:sync": "bun run build && cap sync",
     "fix": "biome check --write"
   },
   "dependencies": {
@@ -29,7 +30,7 @@
     "dotenv-cli": "^11.0.0",
     "fluoro": "^1.1.2",
     "fp-ts": "^2.16.11",
-    "kysely": "^0.28.11",
+    "kysely": "^0.29.6",
     "lit-html": "^3.3.2",
     "sirv": "^3.0.2",
     "smol-toml": "^1.5.2",
@@ -57,11 +58,11 @@
     "lefthook": "^2.1.10",
     "parcel": "^2.16.4",
     "postcss": "^8.2.1",
-    "typescript": "5.5.3",
+    "typescript": "7.0.2",
     "unocss": "^66.6.7"
   },
   "build": {
-    "appId": "com.himeno-sena.music",
+    "appId": "com.himenosena.music",
     "productName": "Sena Music",
     "directories": {
       "output": "release"

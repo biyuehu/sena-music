@@ -43,7 +43,7 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 if (app.requestSingleInstanceLock()) {
-  app.setAppUserModelId('com.himeno-sena.music')
+  app.setAppUserModelId('com.himenosena.music')
   app.on('second-instance', () => {
     if (mainWindow?.isMinimized()) mainWindow.restore()
     mainWindow?.focus()
