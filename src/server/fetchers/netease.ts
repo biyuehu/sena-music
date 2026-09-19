@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs'
-import type { Playlist } from 'src/common/types'
 import { z } from 'zod'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
+import type { Playlist } from '../../common/types'
 import { CONFIG, logger } from '../common'
 import { PLAYLIST_SONG_ORDER_GAP } from '../constant'
 import { Data } from '../data'

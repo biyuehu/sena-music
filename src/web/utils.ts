@@ -1,5 +1,5 @@
-import type { SongInfo } from 'src/common/types'
 import { type Either, Right } from '@/romi/utils/adt/either'
+import type { SongInfo } from '../common/types'
 
 export function formatTime(s: number) {
   if (Number.isNaN(s)) return '00:00'

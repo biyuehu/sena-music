@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { type Playlist, playListSchema } from 'src/common/types'
 import { type Either, Left } from '@/romi/utils/adt/either'
 import { safeParse, toError } from '@/romi/utils/common'
+import { type Playlist, playListSchema } from '../common/types'
 import { CONFIG } from './common'
 import { PLAYLIST_DATA_FILENAME } from './constant'
 

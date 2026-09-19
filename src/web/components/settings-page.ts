@@ -1,8 +1,8 @@
 import './side-nav'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
-import type { Settings } from 'src/common/types'
 import { defineComponent, State } from '@/romi/web'
+import type { Settings } from '../../common/types'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
 import {

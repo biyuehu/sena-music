@@ -1,6 +1,6 @@
 import { html } from 'lit-html'
-import type { SongInfo, SongSourceType } from 'src/common/types'
 import { defineComponent, State } from '@/romi/web'
+import type { SongInfo, SongSourceType } from '../../common/types'
 import { showToast } from './toast'
 
 export const editSongModal = defineComponent(

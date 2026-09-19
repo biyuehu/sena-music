@@ -5,16 +5,21 @@
   "private": true,
   "type": "module",
   "license": "GPL-3.0",
-  "author": "Romi <me@hotaru.icu>",
+  "author": "Arimura Romi <i@arimuraromi.com>",
   "scripts": {
     "init": "lefthook install",
     "dev:server": "bun --watch src/server/app.ts",
-    "dev:client": "parcel watch \"src/web/views/**\" --watch-dir src --no-cache",
+    "dev:client": "parcel watch \"src/web/views/**\" --watch-dir src --no-cache --dist-dir dist/web",
     "dev": "concurrently -n server,client -c blue,red,green \"bun run dev:server\" \"bun run dev:client\"",
-    "build": "parcel build \"src/web/views/**\" --no-scope-hoist",
+    "build": "parcel build \"src/web/views/**\" --no-scope-hoist --dist-dir dist/web",
+    "desktop:dev:main": "bun --watch scripts/build-desktop.ts --watch",
+    "desktop:dev:app": "bun scripts/build-desktop.ts --watch && electronmon dist/desktop/main.js",
+    "desktop:dev": "concurrently -n client,main,app -c red,blue,green \"bun run dev:client\" \"bun run desktop:dev:main\" \"bun run desktop:dev:app\"",
+    "desktop:build": "bun run build && bun scripts/build-desktop.ts && electron-builder",
     "fix": "biome check --write"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.2",
     "@kotori-bot/i18n": "^1.3.3",
     "@kotori-bot/logger": "^1.3.4",
     "@kotori-bot/tools": "^1.5.2",
@@ -33,6 +38,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
     "@iconify-json/carbon": "^1.2.20",
     "@parcel/config-default": "^2.16.4",
     "@parcel/transformer-css": "^2.16.4",
@@ -44,11 +51,51 @@
     "@unocss/preset-icons": "^66.6.7",
     "concurrently": "^9.2.1",
     "conventional-changelog-cli": "^4.1.0",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "electronmon": "^2.0.4",
     "lefthook": "^2.1.10",
     "parcel": "^2.16.4",
     "postcss": "^8.2.1",
     "typescript": "5.5.3",
     "unocss": "^66.6.7"
+  },
+  "build": {
+    "appId": "com.himeno-sena.music",
+    "productName": "Sena Music",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/desktop/main.js",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist/desktop/main.js"
+    },
+    "extraResources": [
+      {
+        "from": "dist/web",
+        "to": "dist"
+      },
+      {
+        "from": "music.toml",
+        "to": "music.toml"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "electronmon": {
+    "patterns": [
+      "!src/**",
+      "!cache/**",
+      "!data/**",
+      "!scripts/**",
+      "!test/**",
+      "!.parcel-cache/**"
+    ]
   },
   "targets": {
     "default": {

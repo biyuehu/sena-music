@@ -2,11 +2,11 @@ import './add-song-modal'
 import './edit-song-modal'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
-import type { Playlist, SongInfo } from 'src/common/types'
-import { PLAYLIST_SONG_ORDER_GAP } from 'src/server/constant'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
 import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
+import type { Playlist, SongInfo } from '../../common/types'
+import { PLAYLIST_SONG_ORDER_GAP } from '../../server/constant'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
 import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
@@ -44,7 +44,7 @@ defineComponent(
     currentTime: State<string>('00:00'),
     duration: State<string>('00:00'),
     showVolumeBar: State(false),
-    volume: State<number>(0.7),
+    volume: State<number>(1),
     isFullscreen: State<boolean>(false),
     isSyncing: State<boolean>(false),
     isAdding: State<boolean>(false),

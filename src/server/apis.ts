@@ -1,4 +1,3 @@
-import { playListSchema, settingsSchema } from 'src/common/types'
 import z from 'zod'
 import {
   Action,
@@ -11,6 +10,7 @@ import {
   VirtualResourceReturner,
   virtualResourceReturnSchema
 } from '@/romi'
+import { playListSchema, settingsSchema } from '../common/types'
 import {
   addSongHandler,
   getBiliAudioFileHandler,
@@ -97,7 +97,7 @@ const assets = Api.new(
   Action.empty(),
   z.object(),
   z.never(),
-  new AssetsReturner(['dist', 'public'], async (reqRaw, resRaw) => {
+  new AssetsReturner([process.env.SENA_ASSETS_DIR ?? 'dist/web', 'public'], async (reqRaw, resRaw) => {
     resRaw.statusCode = 404
     resRaw.setHeader('Content-Type', 'text/html')
     resRaw.end(/* html */ `

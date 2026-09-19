@@ -1,6 +1,6 @@
 import { html } from 'lit-html'
-import type { SongSourceType } from 'src/common/types'
 import { defineComponent, State } from '@/romi/web'
+import type { SongSourceType } from '../../common/types'
 import { showToast } from './toast'
 
 interface AddSongForm {
