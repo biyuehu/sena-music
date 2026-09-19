@@ -4,6 +4,7 @@ import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
 import { settingsSchema, songSourceTypeSchema } from '../common/types'
+import { getCacheInfo, pruneCache } from './cache'
 import { type AppState, CONFIG } from './common'
 import { saveConfig } from './config'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
@@ -54,7 +55,7 @@ export const setSongSourceHandler = Action.empty<AppState>()
         }
       },
       Left: (err) => {
-        logger.error("Failed to load pla'ylist:", err)
+        logger.error('Failed to load playlist:', err)
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
@@ -441,3 +442,14 @@ export const setSettingsHandler = Action.empty<AppState>()
       return Left({ error: `Failed to save settings: ${stringifyCatchError(err)}` })
     }
   })
+
+export const getCacheInfoHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
+  logger.info('Getting cache info')
+  return Right(getCacheInfo())
+})
+
+export const cleanCacheHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
+  logger.info('Cleaning cache')
+  pruneCache(0)
+  return Right(getCacheInfo())
+})

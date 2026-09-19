@@ -9,6 +9,7 @@ export default defineConfig({
       outFile: resolve(__dirname, 'src/web/views/uno.css')
     }
   },
+  content: { filesystem: ['src/**/*.{html,ts}'] },
   presets: [presetWind3(), presetIcons({ mode: 'bg' })],
   extractors: [extractorArbitraryVariants()]
 })

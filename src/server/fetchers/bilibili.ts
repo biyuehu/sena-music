@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
-import { logger } from '../common'
+import { pruneCache } from '../cache'
+import { CONFIG, logger } from '../common'
 import { Data } from '../data'
 
 export interface BiliVideoInfo {
@@ -360,6 +361,7 @@ export namespace BiliFetcher {
       }
 
       logger.info(`Cached Bilibili audio for ${info.bvid} at ${filePath}`)
+      setTimeout(() => pruneCache(CONFIG.cacheMaxSize * 1024 * 1024), 0)
       return Just(filePath)
     } finally {
       if (existsSync(lockPath)) unlinkSync(lockPath)

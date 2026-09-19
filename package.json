@@ -16,7 +16,7 @@
     "desktop:dev:app": "bun scripts/build-desktop.ts --watch && electronmon dist/desktop/main.js",
     "desktop:dev": "concurrently -n client,main,app -c red,blue,green \"bun run dev:client\" \"bun run desktop:dev:main\" \"bun run desktop:dev:app\"",
     "desktop:build": "bun run build && bun scripts/build-desktop.ts && electron-builder",
-    "web:build": "bun scripts/build-web.ts",
+    "web:build": "bun run build && bun scripts/build-web.ts",
     "mobile:sync": "bun run build && cap sync",
     "fix": "biome check --write"
   },

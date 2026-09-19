@@ -29,7 +29,10 @@ defineComponent(
     isDark: State(getEffectiveTheme() === 'dark'),
     autoNextOnError: State(true),
     colorScheme: State<ColorScheme>('orange'),
-    theme: State<Theme>('auto')
+    theme: State<Theme>('auto'),
+    cacheSize: State(0),
+    cachePath: State(''),
+    cleaningCache: State(false)
   },
   {
     useGlobalStyles: true,
@@ -64,6 +67,16 @@ defineComponent(
         .finally(() => {
           host.loading = false
         })
+
+      httpClient.getCacheInfo().then((result) =>
+        result.match({
+          Right: (info) => {
+            host.cacheSize = info.sizeBytes
+            host.cachePath = info.path
+          },
+          Left: ({ error }) => showToast(`加载缓存信息失败：${error}`, 'error')
+        })
+      )
 
       const handleThemeChange = (e: Event): void => {
         const detail = (e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>).detail
@@ -174,7 +187,46 @@ defineComponent(
                         <span>${host.saving ? '保存中...' : '保存设置'}</span>
                       </button>
 
-                      <div class="border-t border-[var(--lx-border)] pt-5">
+                      <div class="border-t border-[var(--lx-border)] pt-5 mt-2">
+                        <span class="text-xs font-bold opacity-50 uppercase tracking-wider">缓存管理</span>
+                      </div>
+                      
+                      <div class="flex flex-col gap-3 text-sm">
+                        <div class="flex flex-col gap-1">
+                          <span class="text-xs font-bold opacity-70">缓存目录</span>
+                          <span class="font-mono text-[11px] opacity-80 break-all select-text bg-[var(--lx-bg-alt)] p-2 rounded">${host.cachePath || '-'}</span>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <span class="text-xs font-bold opacity-70">当前大小</span>
+                          <span class="opacity-80">${host.cachePath ? `${(host.cacheSize / 1024 / 1024).toFixed(2)} MB` : '-'}</span>
+                        </div>
+                        <button
+                          @click=${() => {
+                            if (host.cleaningCache) return
+                            host.cleaningCache = true
+                            httpClient
+                              .cleanCache()
+                              .then((result) => {
+                                result.match({
+                                  Right: (info) => {
+                                    host.cacheSize = info.sizeBytes
+                                    showToast('清理成功', 'success')
+                                  },
+                                  Left: ({ error }) => showToast(`清理失败：${error}`, 'error')
+                                })
+                              })
+                              .finally(() => {
+                                host.cleaningCache = false
+                              })
+                          }}
+                          class="mt-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-sm border border-[var(--lx-border)] hover:bg-[var(--lx-hover)] w-fit transition-colors"
+                        >
+                          <div class="i-carbon-trash-can ${host.cleaningCache ? 'animate-pulse text-[var(--lx-accent)]' : ''}"></div>
+                          <span>${host.cleaningCache ? '清理中...' : '一键清理'}</span>
+                        </button>
+                      </div>
+
+                      <div class="border-t border-[var(--lx-border)] pt-5 mt-2">
                         <span class="text-xs font-bold opacity-50 uppercase tracking-wider">外观与播放</span>
                       </div>
 

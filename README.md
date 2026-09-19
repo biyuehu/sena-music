@@ -1,6 +1,6 @@
 # Sena-Music
 
-A lightweight self-hosted music player that aggregates songs from multiple sources into a unified playlist (NetEase source as main source playlist). You can listen songs that need VIP or banned by the mainland.
+A lightweight self-hosted music player that aggregates songs from multiple sources into a unified playlist (NetEase source as main source playlist). You can listen to songs that need VIP or banned in the mainland.
 
 > **This project is under development and doesn't have a stable release yet.**
 
@@ -24,7 +24,7 @@ A lightweight self-hosted music player that aggregates songs from multiple sourc
 | Tool | Required | Purpose |
 | ------ | ---------- | --------- |
 | Bun / Node | Yes | Runtime and package manager |
-| ffmpeg | No | Transcoding audio streams to MP3 (Bilibili and YouTube source need) |
+| ffmpeg | No | Transcoding audio streams to MP3 (Bilibili and YouTube sources need) |
 | yt-dlp | No | Fetching YouTube audio (YouTube source needs) |
 
 ## Development

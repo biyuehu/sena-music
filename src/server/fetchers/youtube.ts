@@ -2,7 +2,8 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
-import { logger, RUNTIME } from '../common'
+import { pruneCache } from '../cache'
+import { CONFIG, logger, RUNTIME } from '../common'
 import { Data } from '../data'
 
 export namespace YoutubeFetcher {
@@ -148,6 +149,7 @@ export namespace YoutubeFetcher {
       }
 
       logger.info(`Cached YouTube audio for ${videoId} at ${filePath}`)
+      setTimeout(() => pruneCache(CONFIG.cacheMaxSize * 1024 * 1024), 0)
       return Just(filePath)
     } catch (err) {
       logger.error(`Unexpected error during YouTube transcode for ${videoId}:`, err)
