@@ -106,4 +106,4 @@ src/
 
 ## License
 
-GPL-3.0
+Under the GNU General Public License v3.0.

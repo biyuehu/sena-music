@@ -59,10 +59,7 @@ jobs:
         run: bun install
 
       - name: Build web
-        run: bun run build
-
-      - name: Build server
-        run: bun run server:build
+        run: bun run web:build
 
       - name: Upload web
         uses: actions/upload-artifact@v4
@@ -112,7 +109,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: zulu
-          java-version: '17'
+          java-version: '21'
           cache: gradle
 
       - name: Install dependencies
