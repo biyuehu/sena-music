@@ -15,6 +15,7 @@ on:
       - 'uno.config.ts'
       - 'capacitor.config.ts'
       - '.postcssrc.json'
+      - '.github/**'
   pull_request:
     branches: [main]
     paths: *paths
