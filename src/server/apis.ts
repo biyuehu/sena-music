@@ -20,6 +20,7 @@ import {
   getCacheInfoHandler,
   getLocalAudioFilesHandler,
   getPlaylistHandler,
+  getQQAudioFileHandler,
   getSettingsHandler,
   getYoutubeAudioFileHandler,
   removeSongHandler,
@@ -93,6 +94,13 @@ const getYoutubeAudioFile = Api.new(
   new VirtualResourceReturner()
 )
 
+const getQQAudioFile = Api.new(
+  getQQAudioFileHandler,
+  virtualResourceReturnSchema,
+  virtualResourceReturnSchema,
+  new VirtualResourceReturner()
+)
+
 const getSettings = Api.new(getSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonReturner())
 
 const setSettings = Api.new(setSettingsHandler, settingsSchema, standardJsonReturnErrorSchema, new JsonReturner())
@@ -139,6 +147,7 @@ export const appRoute = {
   getLocalAudioFiles,
   getBiliAudioFile,
   getYoutubeAudioFile,
+  getQQAudioFile,
   getSettings,
   setSettings,
   getCacheInfo,

@@ -35,7 +35,7 @@ export const editSongModal = defineComponent(
       const handleSubmit = (): void => {
         const current = host.draft
         if (!current) return
-        if (!current.value?.trim() && current.type !== 'netease') {
+        if (!current.value?.trim() && current.type !== 'netease' && current.type !== 'qq') {
           showToast('歌曲地址不能为空', 'error')
           return
         }
@@ -111,6 +111,7 @@ export const editSongModal = defineComponent(
                   }}
                 >
                   <option value="netease">网易云音乐</option>
+                  <option value="qq">QQ音乐</option>
                   <option value="local">本地文件</option>
                   <option value="bili">Bilibili</option>
                   <option value="youtube">YouTube</option>
@@ -141,7 +142,7 @@ export const editSongModal = defineComponent(
               <button
                 class="flex-1 py-2.5 rounded font-medium text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 @click=${handleSubmit}
-                ?disabled=${host.isLoading || (!draft.value.trim() && draft.type !== 'netease')}
+                ?disabled=${host.isLoading || (!draft.value.trim() && draft.type !== 'netease' && draft.type !== 'qq')}
               >
                 ${host.isLoading ? '保存中...' : '保存修改'}
               </button>

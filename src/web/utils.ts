@@ -20,6 +20,8 @@ export async function getSongUrl(song: SongInfo): Promise<Either<string, string>
       return Right(`/getBiliAudioFile?id=${song.id}`)
     case 'youtube':
       return Right(`/getYoutubeAudioFile?id=${song.id}`)
+    case 'qq':
+      return Right(`/getQQAudioFile?id=${song.id}`)
     default:
       return Right(song.value)
   }

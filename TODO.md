@@ -5,4 +5,5 @@
 - [ ] fetch music lyrics
 - [ ] desktop lyrics display
 - [ ] Non-SPA Application playing music problem
-- [ ] QQ Music source
+- [x] QQ Music source
+- [ ] 什么时候把多余 db configuration 移除掉？

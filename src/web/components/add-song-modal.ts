@@ -166,6 +166,7 @@ export const addSongModal = defineComponent(
                   }}
                 >
                   <option value="netease">网易云音乐</option>
+                  <option value="qq">QQ音乐</option>
                   <option value="local">本地文件</option>
                   <option value="bili">Bilibili</option>
                   <option value="youtube">YouTube</option>
@@ -174,16 +175,16 @@ export const addSongModal = defineComponent(
               </div>
               
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲类型 *</label>
+                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲值 *</label>
                 <input
                   type="text"
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm cursor-pointer focus:border-[var(--lx-accent)] focus:outline-none"
-                                    .value=${host.form.value}
+                  .value=${host.form.value}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
                     host.form = { ...host.form, value: target.value }
                   }}
-                  placeholder="请输入歌曲地址或网易云音乐ID"
+                  placeholder="请输入歌曲地址、网易云音乐ID或QQ音乐MID/链接"
                 />
               </div>
             </div>

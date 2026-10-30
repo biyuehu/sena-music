@@ -7,9 +7,10 @@ export type SongType = ADT<{
   bili: string
   youtube: string
   url: string
+  qq: string
 }>
 
-export const songSourceTypeSchema = z.enum(['netease', 'local', 'bili', 'youtube', 'url'])
+export const songSourceTypeSchema = z.enum(['netease', 'local', 'bili', 'youtube', 'url', 'qq'])
 
 export type SongSourceType = z.infer<typeof songSourceTypeSchema>
 

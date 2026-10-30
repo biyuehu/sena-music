@@ -18,7 +18,8 @@
     "desktop:build": "bun run build && bun scripts/build-desktop.ts && electron-builder --publish never",
     "web:build": "bun run build && bun scripts/build-web.ts",
     "mobile:sync": "bun run build && cap sync",
-    "fix": "biome check --write"
+    "fix": "biome check --write",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",

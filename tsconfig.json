@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["bun"],
     "paths": {
       "@/romi": ["./src/framework/core/index.ts"],
       "@/romi/client": ["./src/framework/core/client.ts"],

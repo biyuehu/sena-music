@@ -11,6 +11,7 @@ import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
 import { BiliFetcher } from './fetchers/bilibili'
 import { NeteaseFetcher } from './fetchers/netease'
+import { QQFetcher } from './fetchers/qq'
 import { YoutubeFetcher } from './fetchers/youtube'
 
 export const getPlaylistHandler = Action.empty<AppState>().bind(async (_data, { logger }) =>
@@ -412,6 +413,58 @@ export const getBiliAudioFileHandler = Action.empty<AppState>()
       return Left({
         type: 'application/json',
         content: JSON.stringify({ error: 'Failed to get Bilibili audio file' }),
+        code: 502
+      })
+    }
+
+    return Right({
+      type: 'audio/mpeg',
+      path: audioFilePathResult.value,
+      headers: {
+        'Accept-Ranges': 'bytes'
+      }
+    })
+  })
+
+export const getQQAudioFileHandler = Action.empty<AppState>()
+  .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }) => {
+    const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
+    if (data.isLeft()) {
+      logger.error('Failed to load playlist:', data.value)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` }),
+        code: 500
+      })
+    }
+    if (data.value === void 0) {
+      logger.warn(`Song with id ${id} not found`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} not found` }),
+        code: 404
+      })
+    }
+
+    if (data.value.type !== 'qq' || (!data.value.value.trim() && !data.value.id.trim())) {
+      logger.warn(`Song with id ${id} is not a QQ Music source`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: `Song with id ${id} is not a QQ Music source` }),
+        code: 400
+      })
+    }
+
+    const songValue = data.value.value.trim() || data.value.id.trim()
+    logger.info(`Getting QQ Music audio for song "${data.value.name}" (id: ${id}, value: "${songValue}") ...`)
+
+    const audioFilePathResult = await QQFetcher.getAudioFilePath(songValue)
+    if (audioFilePathResult.isNothing()) {
+      logger.error(`Failed to get QQ Music audio file for song ${id}`)
+      return Left({
+        type: 'application/json',
+        content: JSON.stringify({ error: 'Failed to get QQ Music audio file' }),
         code: 502
       })
     }

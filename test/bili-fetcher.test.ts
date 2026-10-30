@@ -48,36 +48,15 @@ describe('BiliFetcher', () => {
     })
   })
 
-  describe('getAudioSource', () => {
-    it('should extract audio stream URL for test URL', async () => {
-      const result = await BiliFetcher.getAudioSource(testUrl)
+  describe('getAudioFilePath', () => {
+    it('should get audio file path for test URL', async () => {
+      const result = await BiliFetcher.getAudioFilePath(testUrl)
       expect(result.isJust()).toBe(true)
 
       if (result.isJust()) {
-        const source = result.value
-        expect(source.url.startsWith('http')).toBe(true)
-        expect(source.mimeType).toBe('audio/mp4')
-        console.log(`[Test] Audio stream URL: ${source.url.slice(0, 100)}...`)
-      }
-    })
-  })
-
-  describe('fetchProxyStream', () => {
-    it('should stream audio chunks with Range header', async () => {
-      const sourceResult = await BiliFetcher.getAudioSource(testUrl)
-      expect(sourceResult.isJust()).toBe(true)
-
-      if (sourceResult.isJust()) {
-        const streamResult = await BiliFetcher.fetchProxyStream(sourceResult.value.url, 'bytes=0-1023')
-        expect(streamResult.isJust()).toBe(true)
-
-        if (streamResult.isJust()) {
-          const res = streamResult.value
-          expect(res.status).toBe(206)
-          expect(res.headers['Accept-Ranges']).toBe('bytes')
-          expect(res.headers['Content-Range']).toBeDefined()
-          console.log(`[Test] CDN Response Status: ${res.status}, Content-Range: ${res.headers['Content-Range']}`)
-        }
+        const filePath = result.value
+        expect(filePath.endsWith('.mp3')).toBe(true)
+        console.log(`[Test] Audio file path: ${filePath}`)
       }
     })
   })

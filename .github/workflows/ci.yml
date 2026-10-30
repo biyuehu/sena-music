@@ -39,6 +39,9 @@ jobs:
       - name: Check code
         run: bun run fix && git diff --exit-code
 
+      - name: Type check
+        run: bun run check
+
       - name: Build
         run: bun run build
 
