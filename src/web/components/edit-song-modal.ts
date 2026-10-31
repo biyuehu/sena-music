@@ -1,6 +1,7 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import type { SongInfo, SongSourceType } from '../../common/types'
+import type { SongInfo, SongLyricSourceType, SongSourceType } from '../../common/types'
+import { httpClient } from '../client'
 import { showToast } from './toast'
 
 export const editSongModal = defineComponent(
@@ -9,7 +10,14 @@ export const editSongModal = defineComponent(
     isOpen: State(false),
     song: State<SongInfo | null>(null),
     draft: State<SongInfo | null>(null),
-    isLoading: State(false)
+    isLoading: State(false),
+    showLyricSection: State(false),
+    lyricType: State<SongLyricSourceType>('auto'),
+    lyricValue: State(''),
+    lyricOffset: State(0),
+    customOriginal: State(''),
+    customTranslation: State(''),
+    customRomaji: State('')
   },
   {
     useGlobalStyles: true,
@@ -22,7 +30,29 @@ export const editSongModal = defineComponent(
     `,
     render: (host) => {
       if (!host.isOpen || !host.song) return html``
-      if (host.draft?.id !== host.song.id) host.draft = { ...host.song }
+      if (host.draft?.id !== host.song.id) {
+        host.draft = { ...host.song }
+        host.lyricType = host.song.lyricConfig?.type ?? 'auto'
+        host.lyricValue = host.song.lyricConfig?.value ?? ''
+        host.lyricOffset = host.song.lyricConfig?.offset ?? 0
+        host.customOriginal = ''
+        host.customTranslation = ''
+        host.customRomaji = ''
+
+        // 如果是自定义歌词，尝试异步拉取已有歌词填充表单
+        if (host.lyricType === 'custom') {
+          httpClient.getLyric({ id: host.song.id }).then((r) =>
+            r.match({
+              Right: (lyric) => {
+                host.customOriginal = lyric.original ?? ''
+                host.customTranslation = lyric.translation ?? ''
+                host.customRomaji = lyric.romaji ?? ''
+              },
+              Left: () => {}
+            })
+          )
+        }
+      }
       const draft = host.draft
 
       const handleClose = () => {
@@ -32,7 +62,7 @@ export const editSongModal = defineComponent(
         host.dispatchEvent(new CustomEvent('close'))
       }
 
-      const handleSubmit = (): void => {
+      const handleSubmit = async (): Promise<void> => {
         const current = host.draft
         if (!current) return
         if (!current.value?.trim() && current.type !== 'netease' && current.type !== 'qq') {
@@ -43,19 +73,30 @@ export const editSongModal = defineComponent(
         host.isLoading = true
 
         try {
+          if (host.lyricType === 'custom') {
+            await httpClient.saveCustomLyric({
+              id: current.id,
+              original: host.customOriginal.trim(),
+              translation: host.customTranslation.trim(),
+              romaji: host.customRomaji.trim()
+            })
+          }
+
           const event = new CustomEvent('edit-song-save', {
             detail: {
               id: current.id,
               source: current.type,
-              value: current.value.trim()
+              value: current.value.trim(),
+              lyricConfig: {
+                type: host.lyricType,
+                value: host.lyricValue.trim(),
+                offset: Number(host.lyricOffset) || 0
+              }
             },
             bubbles: true,
             composed: true
           })
           host.dispatchEvent(event)
-
-          // 等待父组件处理完成，父组件会关闭模态框
-          // 这里不需要手动关闭，由父组件控制
         } catch (err) {
           console.error('Failed to edit song:', err)
           showToast('编辑失败', 'error')
@@ -129,6 +170,123 @@ export const editSongModal = defineComponent(
                     host.draft = { ...draft, value: target.value }
                   }}
                 />
+              </div>
+
+              <!-- 歌词设置折叠区 -->
+              <div class="border border-[var(--lx-border)] rounded-lg p-3 bg-[var(--lx-bg-alt)]">
+                <div 
+                  class="flex justify-between items-center cursor-pointer select-none"
+                  @click=${() => (host.showLyricSection = !host.showLyricSection)}
+                >
+                  <span class="text-sm font-semibold text-[var(--lx-text)] flex items-center gap-1.5">
+                    <span class="i-carbon-document-audio"></span> 歌词设置
+                  </span>
+                  <span class="${host.showLyricSection ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'} text-sm opacity-60"></span>
+                </div>
+
+                ${
+                  host.showLyricSection
+                    ? html`
+                  <div class="mt-3 space-y-3 pt-3 border-t border-[var(--lx-border)]">
+                    <div>
+                      <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">歌词绑定源</label>
+                      <select
+                        class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                        .value=${host.lyricType}
+                        @change=${(e: Event) => {
+                          const target = e.target as HTMLSelectElement
+                          host.lyricType = target.value as SongLyricSourceType
+                        }}
+                      >
+                        <option value="auto">默认自动（网易云优先 / 自动匹配）</option>
+                        <option value="netease">指定网易云歌曲 ID</option>
+                        <option value="qq">指定 QQ 音乐 MID</option>
+                        <option value="local">指定本地 LRC 路径</option>
+                        <option value="custom">手动自定义输入（三轨）</option>
+                        <option value="none">纯音乐 / 不展示歌词</option>
+                      </select>
+                    </div>
+
+                    ${
+                      host.lyricType === 'netease' || host.lyricType === 'qq' || host.lyricType === 'local'
+                        ? html`
+                      <div>
+                        <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">
+                          ${host.lyricType === 'netease' ? '网易云歌曲 ID' : host.lyricType === 'qq' ? 'QQ 音乐 MID / 链接' : '本地 .lrc 文件路径'}
+                        </label>
+                        <input
+                          type="text"
+                          class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                          .value=${host.lyricValue}
+                          placeholder="${host.lyricType === 'netease' ? '例如 536622304' : host.lyricType === 'qq' ? '例如 002TTnfc13TkgO' : '例如 /path/to/song.lrc'}"
+                          @input=${(e: Event) => {
+                            host.lyricValue = (e.target as HTMLInputElement).value
+                          }}
+                        />
+                      </div>`
+                        : ''
+                    }
+
+                    ${
+                      host.lyricType === 'custom'
+                        ? html`
+                      <div class="space-y-2">
+                        <div>
+                          <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">原文歌词 (LRC 格式) *</label>
+                          <textarea
+                            rows="4"
+                            class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs font-mono focus:border-[var(--lx-accent)] focus:outline-none"
+                            placeholder="LRC 格式，例如：00:01.00 原文内容..."
+                            .value=${host.customOriginal}
+                            @input=${(e: Event) => {
+                              host.customOriginal = (e.target as HTMLTextAreaElement).value
+                            }}
+                          ></textarea>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">中文翻译 (可选，同时间戳)</label>
+                          <textarea
+                            rows="3"
+                            class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs font-mono focus:border-[var(--lx-accent)] focus:outline-none"
+                            placeholder="可选，同时间戳翻译内容..."
+                            .value=${host.customTranslation}
+                            @input=${(e: Event) => {
+                              host.customTranslation = (e.target as HTMLTextAreaElement).value
+                            }}
+                          ></textarea>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">音译 / 罗马音 (可选，同时间戳)</label>
+                          <textarea
+                            rows="3"
+                            class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs font-mono focus:border-[var(--lx-accent)] focus:outline-none"
+                            placeholder="可选，同时间戳罗马音/音译..."
+                            .value=${host.customRomaji}
+                            @input=${(e: Event) => {
+                              host.customRomaji = (e.target as HTMLTextAreaElement).value
+                            }}
+                          ></textarea>
+                        </div>
+                      </div>`
+                        : ''
+                    }
+
+                    <div>
+                      <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">歌词时间轴偏移 (毫秒，正数推迟，负数提前)</label>
+                      <input
+                        type="number"
+                        step="100"
+                        class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                        .value=${host.lyricOffset.toString()}
+                        placeholder="0"
+                        @input=${(e: Event) => {
+                          host.lyricOffset = Number((e.target as HTMLInputElement).value) || 0
+                        }}
+                      />
+                    </div>
+                  </div>`
+                    : ''
+                }
               </div>
             </div>
             <div class="flex gap-3 mt-8">

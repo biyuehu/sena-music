@@ -9,6 +9,13 @@ import type { Playlist, SongInfo } from '../../common/types'
 import { PLAYLIST_SONG_ORDER_GAP } from '../../server/constant'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
+import {
+  findActiveLyricIndex,
+  getStoredLyricPreference,
+  mergeThreeTrackLyrics,
+  type ParsedLyricLine,
+  saveStoredLyricPreference
+} from '../lyric'
 import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
@@ -29,6 +36,9 @@ interface PlayerActions {
   openAddSongModal: () => void
   updateSongOrder: (id: string, newIndex: number) => void
   removeSong: (id: string) => void
+  seekToTime: (time: number) => void
+  scrollToActiveLyric: (smooth?: boolean) => void
+  handleLyricScroll: () => void
 }
 
 defineComponent(
@@ -60,7 +70,13 @@ defineComponent(
     coverErrorMap: State<Record<string, boolean>>({}),
     isDark: State(getEffectiveTheme() === 'dark'),
     searchTerm: State<string>(''),
-    theme: State<Theme>('auto')
+    theme: State<Theme>('auto'),
+    lyrics: State<ParsedLyricLine[]>([]),
+    lyricStatus: State<'loading' | 'ok' | 'pure_music' | 'no_lyric'>('loading'),
+    activeLyricIndex: State<number>(-1),
+    lyricPref: State(getStoredLyricPreference()),
+    isUserScrollingLyrics: State<boolean>(false),
+    showMobileLyrics: State<boolean>(false)
   },
   {
     useGlobalStyles: true,
@@ -109,6 +125,7 @@ defineComponent(
       loadPlaylist()
       const audio: HTMLAudioElement = new Audio()
       audio.volume = host.volume
+      let lyricScrollTimeout: NodeJS.Timeout | null = null
 
       const handlePlayError = (index: number, error?: string): void => {
         const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
@@ -141,6 +158,42 @@ defineComponent(
           audio.currentTime = 0
           audio.pause()
           host.currentIndex = index
+
+          // 异步加载三轨歌词
+          const currentSong = host.playlist[index]
+          host.lyrics = []
+          host.lyricStatus = 'loading'
+          host.activeLyricIndex = -1
+          httpClient.getLyric({ id: currentSong.id }).then((r) =>
+            r.match({
+              Right: (lyricRes) => {
+                if (host.playlist[host.currentIndex]?.id !== currentSong.id) return
+                if (lyricRes.status === 'ok' && lyricRes.original) {
+                  host.lyrics = mergeThreeTrackLyrics(
+                    lyricRes.original,
+                    lyricRes.translation,
+                    lyricRes.romaji,
+                    lyricRes.offset ?? 0
+                  )
+                  host.lyricStatus = host.lyrics.length > 0 ? 'ok' : 'no_lyric'
+                  if (host.lyrics.length > 0) {
+                    host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+                    setTimeout(() => host.actions?.scrollToActiveLyric(false), 60)
+                  }
+                } else if (lyricRes.status === 'pure_music') {
+                  host.lyricStatus = 'pure_music'
+                } else {
+                  host.lyricStatus = 'no_lyric'
+                }
+              },
+              Left: () => {
+                if (host.playlist[host.currentIndex]?.id === currentSong.id) {
+                  host.lyricStatus = 'no_lyric'
+                }
+              }
+            })
+          )
+
           const audioUrl = await getSongUrl(host.playlist[index])
           if (audioUrl.isLeft()) return handlePlayError(index, audioUrl.value)
           if (!audioUrl.value) return handlePlayError(index)
@@ -210,6 +263,11 @@ defineComponent(
         seek: (e: Known): void => {
           host.showVolumeBar = false
           audio.currentTime = (parseFloat(e.target.value) / 100) * audio.duration
+          host.isUserScrollingLyrics = false
+          if (host.lyrics.length > 0) {
+            host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+            setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
+          }
         },
         setVolume: (val: number): void => {
           audio.volume = host.volume = val
@@ -218,6 +276,11 @@ defineComponent(
         toggleFullscreen: (): void => {
           host.showVolumeBar = false
           host.isFullscreen = !host.isFullscreen
+          if (host.isFullscreen) {
+            setTimeout(() => {
+              host.actions?.scrollToActiveLyric(false)
+            }, 60)
+          }
         },
         openEditModal: (song, e): void => {
           e.stopPropagation()
@@ -278,6 +341,51 @@ defineComponent(
               }
             })
           )
+        },
+        seekToTime: (time: number): void => {
+          audio.currentTime = time
+          host.isUserScrollingLyrics = false
+          if (host.lyrics.length > 0) {
+            host.activeLyricIndex = findActiveLyricIndex(host.lyrics, time)
+            setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
+          }
+          if (!host.isPlaying) {
+            audio
+              .play()
+              .then(() => {
+                host.isPlaying = true
+              })
+              .catch(() => {})
+          }
+        },
+        scrollToActiveLyric: (smooth = true): void => {
+          if (host.activeLyricIndex < 0) return
+          const root = host.shadowRoot
+          if (!root) return
+          const lineEls = root.querySelectorAll(`[data-lyric-index="${host.activeLyricIndex}"]`)
+          lineEls.forEach((el) => {
+            const lineEl = el as HTMLElement
+            const container = lineEl.closest('.lyric-scroll-container') as HTMLElement | null
+            if (container && container.clientHeight > 0) {
+              const containerRect = container.getBoundingClientRect()
+              const lineRect = lineEl.getBoundingClientRect()
+              const offsetInsideContainer = lineRect.top - containerRect.top
+              const targetTop =
+                container.scrollTop + offsetInsideContainer - container.clientHeight / 2 + lineRect.height / 2
+              container.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: smooth ? 'smooth' : 'auto'
+              })
+            }
+          })
+        },
+        handleLyricScroll: (): void => {
+          host.isUserScrollingLyrics = true
+          if (lyricScrollTimeout !== null) clearTimeout(lyricScrollTimeout)
+          lyricScrollTimeout = setTimeout(() => {
+            host.isUserScrollingLyrics = false
+            host.actions?.scrollToActiveLyric(true)
+          }, 3500)
         }
       }
 
@@ -287,6 +395,16 @@ defineComponent(
           host.progress = (audio.currentTime / audio.duration) * 100 || 0
           host.currentTime = formatTime(audio.currentTime)
           host.duration = formatTime(audio.duration)
+        }
+
+        if (host.lyrics.length > 0) {
+          const newIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+          if (newIndex !== host.activeLyricIndex) {
+            host.activeLyricIndex = newIndex
+            if (!host.isUserScrollingLyrics && newIndex >= 0) {
+              host.actions?.scrollToActiveLyric()
+            }
+          }
         }
       }
       audio.onended = (): void => {
@@ -323,7 +441,12 @@ defineComponent(
 
       const handleEdit = (e: Known): void => {
         httpClient
-          .setSongSource({ id: e.detail.id, source: e.detail.source, value: e.detail.value })
+          .setSongSource({
+            id: e.detail.id,
+            source: e.detail.source,
+            value: e.detail.value,
+            lyricConfig: e.detail.lyricConfig
+          })
           .then((r) =>
             r.match({
               Right: ({ playlist }) => {
@@ -360,6 +483,7 @@ defineComponent(
         audio.pause()
         audio.src = ''
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
+        if (lyricScrollTimeout !== null) clearTimeout(lyricScrollTimeout)
         document.removeEventListener('add-song', handleAdd)
         document.removeEventListener('edit-song-save', handleEdit)
         document.removeEventListener('theme-change', handleThemeChange)
@@ -483,6 +607,149 @@ defineComponent(
       input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; cursor: pointer; }
     </style>
   `
+      }
+
+      const hasTranslation = host.lyrics.some((l) => !!l.translation)
+      const hasRomaji = host.lyrics.some((l) => !!l.romaji)
+
+      const toggleTrackPreference = (track: 'translation' | 'romaji', e: Event): void => {
+        e.stopPropagation()
+        const nextPref = { ...host.lyricPref, [track]: !host.lyricPref[track] }
+        host.lyricPref = nextPref
+        saveStoredLyricPreference(nextPref)
+      }
+
+      const renderLyricToolbar = () => {
+        if (!hasTranslation && !hasRomaji) return ''
+        return html`
+          <div class="flex items-center gap-1.5 select-none">
+            ${
+              hasTranslation
+                ? html`
+              <button
+                class="px-2.5 py-0.5 text-xs rounded-full border transition-all cursor-pointer ${
+                  host.lyricPref.translation
+                    ? 'bg-[var(--lx-accent)] text-zinc-900 dark:text-zinc-950 border-[var(--lx-accent)] font-bold shadow-sm'
+                    : 'bg-transparent border-[var(--lx-border)] text-[var(--lx-text-muted)] opacity-70 hover:opacity-100 hover:text-[var(--lx-text)]'
+                }"
+                @click=${(e: Event) => toggleTrackPreference('translation', e)}
+                title="切换翻译展示"
+              >
+                译
+              </button>`
+                : ''
+            }
+            ${
+              hasRomaji
+                ? html`
+              <button
+                class="px-2.5 py-0.5 text-xs rounded-full border transition-all cursor-pointer ${
+                  host.lyricPref.romaji
+                    ? 'bg-[var(--lx-accent)] text-zinc-900 dark:text-zinc-950 border-[var(--lx-accent)] font-bold shadow-sm'
+                    : 'bg-transparent border-[var(--lx-border)] text-[var(--lx-text-muted)] opacity-70 hover:opacity-100 hover:text-[var(--lx-text)]'
+                }"
+                @click=${(e: Event) => toggleTrackPreference('romaji', e)}
+                title="切换音译/罗马音展示"
+              >
+                音
+              </button>`
+                : ''
+            }
+          </div>
+        `
+      }
+
+      const renderLyricContent = (isMobile = false) => {
+        if (host.lyricStatus === 'loading') {
+          return html`
+            <div class="flex flex-col items-center justify-center h-full gap-3 opacity-30">
+              <div class="i-carbon-renew animate-spin text-3xl"></div>
+              <span class="text-sm">正在加载歌词...</span>
+            </div>
+          `
+        }
+        if (host.lyricStatus === 'pure_music') {
+          return html`
+            <div class="flex flex-col items-center justify-center h-full gap-4 opacity-50">
+              <div class="i-carbon-music text-5xl text-[var(--lx-accent)] animate-pulse"></div>
+              <div class="text-lg font-bold tracking-wider">纯音乐，请欣赏</div>
+            </div>
+          `
+        }
+        if (host.lyricStatus === 'no_lyric' || host.lyrics.length === 0) {
+          return html`
+            <div class="flex flex-col items-center justify-center h-full gap-3 opacity-30">
+              <div class="i-carbon-document-audio text-4xl"></div>
+              <span class="text-sm">暂无歌词</span>
+            </div>
+          `
+        }
+
+        return html`
+          <div class="relative w-full h-full overflow-hidden flex flex-col">
+            <div 
+              class="lyric-scroll-container flex-1 overflow-y-auto no-scrollbar scroll-smooth space-y-6 pt-[35%] pb-[45%] px-2 select-none text-left"
+              style="mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 85%, transparent 100%);"
+              @wheel=${() => host.actions?.handleLyricScroll()}
+              @touchmove=${() => host.actions?.handleLyricScroll()}
+            >
+              ${host.lyrics.map((line, idx) => {
+                const isActive = idx === host.activeLyricIndex
+                const isPast = idx < host.activeLyricIndex
+
+                return html`
+                  <div
+                    data-lyric-index="${idx}"
+                    @click=${(e: Event) => {
+                      e.stopPropagation()
+                      host.actions?.seekToTime(line.time)
+                    }}
+                    class="cursor-pointer transition-all duration-300 transform group ${
+                      isActive
+                        ? 'scale-105 opacity-100 font-bold origin-left'
+                        : isPast
+                          ? 'opacity-35 hover:opacity-75 scale-95 origin-left'
+                          : 'opacity-35 hover:opacity-75 origin-left'
+                    }"
+                  >
+                    ${
+                      line.original
+                        ? html`<div class="${isMobile ? 'text-lg' : 'text-2xl'} tracking-tight leading-relaxed transition-colors ${isActive ? 'text-[var(--lx-accent)] font-extrabold' : 'text-[var(--lx-text)]'}">${line.original}</div>`
+                        : ''
+                    }
+                    ${
+                      host.lyricPref.romaji && line.romaji
+                        ? html`<div class="${isMobile ? 'text-xs' : 'text-sm'} opacity-60 font-mono tracking-wide mt-1 text-[var(--lx-text)]">${line.romaji}</div>`
+                        : ''
+                    }
+                    ${
+                      host.lyricPref.translation && line.translation
+                        ? html`<div class="${isMobile ? 'text-sm' : 'text-base'} opacity-80 mt-1 font-normal text-[var(--lx-text)]">${line.translation}</div>`
+                        : ''
+                    }
+                  </div>
+                `
+              })}
+            </div>
+
+            ${
+              host.isUserScrollingLyrics && host.activeLyricIndex >= 0
+                ? html`
+              <button
+                @click=${(e: Event) => {
+                  e.stopPropagation()
+                  host.isUserScrollingLyrics = false
+                  host.actions?.scrollToActiveLyric(true)
+                }}
+                class="absolute right-4 bottom-8 z-30 px-3.5 py-1.5 bg-[var(--lx-accent)] text-zinc-900 dark:text-zinc-950 text-xs font-bold rounded-full shadow-2xl flex items-center gap-1.5 opacity-90 hover:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-[var(--lx-border)]"
+                title="回到当前播放处"
+              >
+                <span class="i-carbon-chevron-down text-sm"></span> 回到当前
+              </button>`
+                : ''
+            }
+          </div>
+        `
       }
 
       return html`
@@ -611,32 +878,73 @@ defineComponent(
       </footer>
     </main>
 
+    <!-- 全屏沉浸式播放器（含多语言三轨歌词） -->
     <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
       <button @click=${() => host.actions?.toggleFullscreen()}
         class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-10">
       </button>
 
-      <div class="flex flex-col md:hidden flex-1 min-h-0 px-8 pt-16 pb-6 gap-6">
-        <div class="flex-1 flex items-center justify-center min-h-0">
-          ${renderCover(song?.cover, 'w-full max-w-[220px] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+      <!-- 移动端视图（支持点击切换封面/歌词模式） -->
+      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-12 pb-6 overflow-hidden relative">
+        <div class="flex justify-between items-center shrink-0 py-2 z-20">
+          <button
+            @click=${() => {
+              host.showMobileLyrics = !host.showMobileLyrics
+              if (host.showMobileLyrics) {
+                setTimeout(() => host.actions?.scrollToActiveLyric(false), 50)
+              }
+            }}
+            class="text-xs px-2.5 py-1 rounded-full border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)] flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <span class="${host.showMobileLyrics ? 'i-carbon-image' : 'i-carbon-document-audio'}"></span>
+            <span>${host.showMobileLyrics ? '切换封面' : '查看歌词'}</span>
+          </button>
+          ${renderLyricToolbar()}
         </div>
-        <div class="flex flex-col gap-1 text-center shrink-0">
-          <h1 class="text-2xl font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
-          <p class="text-sm opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+
+        <div class="flex-1 min-h-0 w-full overflow-hidden relative my-2">
+          ${
+            host.showMobileLyrics
+              ? html`<div class="w-full h-full relative overflow-hidden">${renderLyricContent(true)}</div>`
+              : html`
+                <div class="w-full h-full flex flex-col items-center justify-center cursor-pointer" @click=${() => {
+                  host.showMobileLyrics = true
+                  setTimeout(() => host.actions?.scrollToActiveLyric(false), 50)
+                }}>
+                  ${renderCover(song?.cover, 'w-full max-w-[240px] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+                </div>
+              `
+          }
         </div>
-        <div class="shrink-0">
+
+        <div class="shrink-0 flex flex-col gap-1 text-center py-1 z-20">
+          <h1 class="text-xl font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
+          <p class="text-xs opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+        </div>
+
+        <div class="shrink-0 pt-2 pb-1 z-20">
           ${commonControls(true)}
         </div>
       </div>
 
-      <div class="hidden md:flex w-full max-w-6xl px-12 flex-row items-center justify-center gap-24">
-        <div class="flex flex-col gap-10 w-[420px] shrink-0">
+      <!-- 桌面端视图（左侧封面+控制，右侧沉浸式三轨歌词视窗） -->
+      <div class="hidden md:flex w-full max-w-6xl h-full max-h-[85vh] px-12 flex-row items-center justify-between gap-16">
+        <div class="flex flex-col gap-8 w-[380px] shrink-0">
           ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+          <div class="flex flex-col gap-1">
+            <h1 class="text-3xl font-black text-[var(--lx-accent)] tracking-tighter truncate" title="${song?.name}">${song?.name ?? '未知曲目'}</h1>
+            <p class="text-lg opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+          </div>
           ${commonControls(true)}
         </div>
-        <div class="flex-1 flex flex-col gap-6 text-left">
-          <h1 class="text-7xl font-black text-[var(--lx-accent)] tracking-tighter">${song?.name ?? '未知曲目'}</h1>
-          <p class="text-3xl opacity-40 font-medium">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+
+        <div class="flex-1 h-full min-w-0 flex flex-col pb-10">
+          <div class="flex-none flex justify-end items-center pb-4 border-b border-[var(--lx-border)]/50">
+            ${renderLyricToolbar()}
+          </div>
+          <div class="flex-1 min-h-0 relative mb-6 overflow-hidden">
+            ${renderLyricContent(false)}
+          </div>
         </div>
       </div>
     </div>

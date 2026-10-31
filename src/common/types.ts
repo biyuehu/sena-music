@@ -14,6 +14,16 @@ export const songSourceTypeSchema = z.enum(['netease', 'local', 'bili', 'youtube
 
 export type SongSourceType = z.infer<typeof songSourceTypeSchema>
 
+export const songLyricSourceTypeSchema = z.enum(['auto', 'netease', 'qq', 'local', 'custom', 'none'])
+export type SongLyricSourceType = z.infer<typeof songLyricSourceTypeSchema>
+
+export const songLyricConfigSchema = z.object({
+  type: songLyricSourceTypeSchema,
+  value: z.string().optional(),
+  offset: z.number().optional()
+})
+export type SongLyricConfig = z.infer<typeof songLyricConfigSchema>
+
 export const songInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -21,7 +31,8 @@ export const songInfoSchema = z.object({
   cover: z.string(),
   type: songSourceTypeSchema,
   value: z.string(),
-  order: z.number()
+  order: z.number(),
+  lyricConfig: songLyricConfigSchema.optional()
 })
 
 export type SongInfo = z.infer<typeof songInfoSchema>
@@ -38,6 +49,7 @@ export interface SetSongSourceRequest {
   id: string
   source: SongSourceType
   value: string
+  lyricConfig?: SongLyricConfig
 }
 
 export interface AddSongRequest {
@@ -46,6 +58,7 @@ export interface AddSongRequest {
   cover: string
   type: SongSourceType
   value: string
+  lyricConfig?: SongLyricConfig
 }
 
 export interface SetSongOrderRequest {
@@ -70,3 +83,23 @@ export const cacheInfoSchema = z.object({
 })
 
 export type CacheInfo = z.infer<typeof cacheInfoSchema>
+
+export const lyricStatusSchema = z.enum(['ok', 'pure_music', 'no_lyric'])
+export type LyricStatus = z.infer<typeof lyricStatusSchema>
+
+export const lyricResultSchema = z.object({
+  status: lyricStatusSchema,
+  original: z.string().optional(),
+  translation: z.string().optional(),
+  romaji: z.string().optional(),
+  offset: z.number().optional()
+})
+export type LyricResult = z.infer<typeof lyricResultSchema>
+
+export const saveCustomLyricSchema = z.object({
+  id: z.string(),
+  original: z.string().optional().default(''),
+  translation: z.string().optional().default(''),
+  romaji: z.string().optional().default('')
+})
+export type SaveCustomLyricRequest = z.infer<typeof saveCustomLyricSchema>

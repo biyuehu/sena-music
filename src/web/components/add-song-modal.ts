@@ -1,6 +1,6 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import type { SongSourceType } from '../../common/types'
+import type { SongLyricSourceType, SongSourceType } from '../../common/types'
 import { showToast } from './toast'
 
 interface AddSongForm {
@@ -9,6 +9,9 @@ interface AddSongForm {
   cover: string
   type: SongSourceType
   value: string
+  lyricType: SongLyricSourceType
+  lyricValue: string
+  lyricOffset: number
 }
 
 export const addSongModal = defineComponent(
@@ -20,9 +23,13 @@ export const addSongModal = defineComponent(
       artists: '',
       cover: '',
       type: 'url',
-      value: ''
+      value: '',
+      lyricType: 'auto',
+      lyricValue: '',
+      lyricOffset: 0
     }),
-    isLoading: State(false)
+    isLoading: State(false),
+    showLyricSection: State(false)
   },
   {
     useGlobalStyles: true,
@@ -42,8 +49,12 @@ export const addSongModal = defineComponent(
           artists: '',
           cover: '',
           type: 'url',
-          value: ''
+          value: '',
+          lyricType: 'auto',
+          lyricValue: '',
+          lyricOffset: 0
         }
+        host.showLyricSection = false
       }
 
       const handleClose = () => {
@@ -64,7 +75,6 @@ export const addSongModal = defineComponent(
           .map((a) => a.trim())
           .filter((a) => a)
 
-        // 触发添加逻辑
         host.isLoading = true
 
         try {
@@ -75,7 +85,12 @@ export const addSongModal = defineComponent(
                 artists,
                 cover: host.form.cover.trim(),
                 type: host.form.type,
-                value: host.form.value.trim()
+                value: host.form.value.trim(),
+                lyricConfig: {
+                  type: host.form.lyricType,
+                  value: host.form.lyricValue.trim(),
+                  offset: Number(host.form.lyricOffset) || 0
+                }
               },
               bubbles: true,
               composed: true
@@ -186,6 +201,80 @@ export const addSongModal = defineComponent(
                   }}
                   placeholder="请输入歌曲地址、网易云音乐ID或QQ音乐MID/链接"
                 />
+              </div>
+
+              <!-- 歌词设置折叠区 -->
+              <div class="border border-[var(--lx-border)] rounded-lg p-3 bg-[var(--lx-bg-alt)]">
+                <div 
+                  class="flex justify-between items-center cursor-pointer select-none"
+                  @click=${() => (host.showLyricSection = !host.showLyricSection)}
+                >
+                  <span class="text-sm font-semibold text-[var(--lx-text)] flex items-center gap-1.5">
+                    <span class="i-carbon-document-audio"></span> 歌词设置（可选）
+                  </span>
+                  <span class="${host.showLyricSection ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'} text-sm opacity-60"></span>
+                </div>
+
+                ${
+                  host.showLyricSection
+                    ? html`
+                  <div class="mt-3 space-y-3 pt-3 border-t border-[var(--lx-border)]">
+                    <div>
+                      <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">歌词绑定源</label>
+                      <select
+                        class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                        .value=${host.form.lyricType}
+                        @change=${(e: Event) => {
+                          const target = e.target as HTMLSelectElement
+                          host.form = { ...host.form, lyricType: target.value as SongLyricSourceType }
+                        }}
+                      >
+                        <option value="auto">默认自动（网易云优先 / 自动匹配）</option>
+                        <option value="netease">指定网易云歌曲 ID</option>
+                        <option value="qq">指定 QQ 音乐 MID</option>
+                        <option value="local">指定本地 LRC 路径</option>
+                        <option value="none">纯音乐 / 不展示歌词</option>
+                      </select>
+                    </div>
+
+                    ${
+                      host.form.lyricType === 'netease' ||
+                      host.form.lyricType === 'qq' ||
+                      host.form.lyricType === 'local'
+                        ? html`
+                      <div>
+                        <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">
+                          ${host.form.lyricType === 'netease' ? '网易云歌曲 ID' : host.form.lyricType === 'qq' ? 'QQ 音乐 MID / 链接' : '本地 .lrc 文件路径'}
+                        </label>
+                        <input
+                          type="text"
+                          class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                          .value=${host.form.lyricValue}
+                          placeholder="${host.form.lyricType === 'netease' ? '例如 536622304' : host.form.lyricType === 'qq' ? '例如 002TTnfc13TkgO' : '例如 /path/to/song.lrc'}"
+                          @input=${(e: Event) => {
+                            host.form = { ...host.form, lyricValue: (e.target as HTMLInputElement).value }
+                          }}
+                        />
+                      </div>`
+                        : ''
+                    }
+
+                    <div>
+                      <label class="block text-xs font-medium mb-1 text-[var(--lx-text)]">歌词时间轴偏移 (毫秒)</label>
+                      <input
+                        type="number"
+                        step="100"
+                        class="w-full p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-main)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                        .value=${host.form.lyricOffset.toString()}
+                        placeholder="0"
+                        @input=${(e: Event) => {
+                          host.form = { ...host.form, lyricOffset: Number((e.target as HTMLInputElement).value) || 0 }
+                        }}
+                      />
+                    </div>
+                  </div>`
+                    : ''
+                }
               </div>
             </div>
             <div class="flex gap-3 mt-8">

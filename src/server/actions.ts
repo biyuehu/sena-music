@@ -3,13 +3,14 @@ import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
-import { settingsSchema, songSourceTypeSchema } from '../common/types'
+import { saveCustomLyricSchema, settingsSchema, songLyricConfigSchema, songSourceTypeSchema } from '../common/types'
 import { getCacheInfo, pruneCache } from './cache'
 import { type AppState, CONFIG } from './common'
 import { saveConfig } from './config'
 import { PLAYLIST_SONG_ORDER_GAP } from './constant'
 import { Data } from './data'
 import { BiliFetcher } from './fetchers/bilibili'
+import { LyricFetcher } from './fetchers/lyrics'
 import { NeteaseFetcher } from './fetchers/netease'
 import { QQFetcher } from './fetchers/qq'
 import { YoutubeFetcher } from './fetchers/youtube'
@@ -30,11 +31,12 @@ export const setSongSourceHandler = Action.empty<AppState>()
       z.object({
         id: z.string(),
         source: songSourceTypeSchema,
-        value: z.string()
+        value: z.string(),
+        lyricConfig: songLyricConfigSchema.optional()
       })
     )
   ] as const)
-  .bind(async ([{ id, source, value }], { logger }) =>
+  .bind(async ([{ id, source, value, lyricConfig }], { logger }) =>
     Data.load().match({
       Right: (playlist) => {
         const songIndex = playlist.findIndex((song) => song.id === id)
@@ -44,7 +46,11 @@ export const setSongSourceHandler = Action.empty<AppState>()
           return Left({ error: `Song with id ${id} not found` })
         }
 
-        const updatedPlaylist = playlist.map((song) => (song.id === id ? { ...song, type: source, value } : song))
+        const updatedPlaylist = playlist.map((song) =>
+          song.id === id
+            ? { ...song, type: source, value, ...(lyricConfig !== undefined ? { lyricConfig } : {}) }
+            : song
+        )
 
         try {
           Data.save(updatedPlaylist)
@@ -70,11 +76,12 @@ export const addSongHandler = Action.empty<AppState>()
         artists: z.array(z.string()),
         cover: z.string(),
         type: songSourceTypeSchema,
-        value: z.string()
+        value: z.string(),
+        lyricConfig: songLyricConfigSchema.optional()
       })
     )
   ] as const)
-  .bind(async ([{ name, artists, cover, type, value }], { logger }) =>
+  .bind(async ([{ name, artists, cover, type, value, lyricConfig }], { logger }) =>
     Data.load().match({
       Right: (playlist) => {
         const newSong = {
@@ -84,7 +91,8 @@ export const addSongHandler = Action.empty<AppState>()
           cover,
           type,
           value,
-          order: 0
+          order: 0,
+          ...(lyricConfig !== undefined ? { lyricConfig } : {})
         }
 
         const updatedPlaylist = [newSong, ...playlist].map((song, index) => ({
@@ -506,3 +514,34 @@ export const cleanCacheHandler = Action.empty<AppState>().bind(async (_data, { l
   pruneCache(0)
   return Right(getCacheInfo())
 })
+
+export const getLyricHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(z.object({ id: z.string() }))] as const)
+  .bind(async ([{ id }], { logger }) => {
+    const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
+    if (data.isLeft()) {
+      logger.error('Failed to load playlist:', data.value)
+      return Left({ error: `Failed to load playlist: ${stringifyCatchError(data.value)}` })
+    }
+    const song = data.value
+    if (!song) {
+      logger.warn(`Song with id ${id} not found`)
+      return Left({ error: `Song with id ${id} not found` })
+    }
+
+    const lyric = await LyricFetcher.getLyric(song)
+    return Right(lyric)
+  })
+
+export const saveCustomLyricHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(saveCustomLyricSchema)] as const)
+  .bind(async ([{ id, original, translation, romaji }], { logger }) => {
+    try {
+      Data.saveCustomLyric(id, { original, translation, romaji })
+      logger.info(`Saved custom lyric for song ${id}`)
+      return Right({ success: true })
+    } catch (err) {
+      logger.error(`Failed to save custom lyric for song ${id}:`, err)
+      return Left({ error: `Failed to save custom lyric: ${stringifyCatchError(err)}` })
+    }
+  })
