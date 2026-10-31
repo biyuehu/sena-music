@@ -45,13 +45,6 @@ dataDirectory = "data"
 playlistId = 123456789  # NetEase Cloud Music playlist ID
 cacheDirectory = "cache"
 cacheMaxSize = 512      # Cache size limit in MB
-
-[db]
-host = "localhost"
-port = 3306
-user = "root"
-password = ""
-database = "sena_music"
 ```
 
 ### Setup Git Hooks

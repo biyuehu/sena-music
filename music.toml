@@ -4,9 +4,3 @@ playlistId = 2653919517
 cacheDirectory = "cache"
 cacheMaxSize = 2048
 
-[db]
-host = "localhost"
-port = 5432
-user = "user"
-password = "password"
-database = "database"

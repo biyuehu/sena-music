@@ -5,13 +5,6 @@ import z from 'zod'
 
 const configSchema = z.object({
   port: z.number().int().positive(),
-  db: z.object({
-    host: z.string(),
-    port: z.number().int().positive(),
-    user: z.string(),
-    password: z.string(),
-    database: z.string()
-  }),
   dataDirectory: z.string(),
   playlistId: z.number().int().positive(),
   cacheDirectory: z.string(),
