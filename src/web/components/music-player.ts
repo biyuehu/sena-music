@@ -22,6 +22,14 @@ import { showToast } from './toast'
 
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
 
+interface ContextMenuState {
+  visible: boolean
+  x: number
+  y: number
+  song: SongInfo | null
+  index: number
+}
+
 interface PlayerActions {
   play: (index: number, onlyLoad?: boolean) => Promise<void>
   toggle: () => void
@@ -39,6 +47,8 @@ interface PlayerActions {
   seekToTime: (time: number) => void
   scrollToActiveLyric: (smooth?: boolean) => void
   handleLyricScroll: () => void
+  openContextMenu: (e: MouseEvent, song: SongInfo, index: number) => void
+  closeContextMenu: () => void
 }
 
 defineComponent(
@@ -76,7 +86,14 @@ defineComponent(
     activeLyricIndex: State<number>(-1),
     lyricPref: State(getStoredLyricPreference()),
     isUserScrollingLyrics: State<boolean>(false),
-    showMobileLyrics: State<boolean>(false)
+    showMobileLyrics: State<boolean>(false),
+    contextMenu: State<ContextMenuState>({
+      visible: false,
+      x: 0,
+      y: 0,
+      song: null,
+      index: -1
+    })
   },
   {
     useGlobalStyles: true,
@@ -386,6 +403,28 @@ defineComponent(
             host.isUserScrollingLyrics = false
             host.actions?.scrollToActiveLyric(true)
           }, 3500)
+        },
+        openContextMenu: (e: MouseEvent, song: SongInfo, index: number): void => {
+          e.preventDefault()
+          e.stopPropagation()
+          const menuWidth = 208
+          const menuHeight = 290
+          const x =
+            e.clientX + menuWidth > window.innerWidth ? Math.max(10, window.innerWidth - menuWidth - 10) : e.clientX
+          const y =
+            e.clientY + menuHeight > window.innerHeight ? Math.max(10, window.innerHeight - menuHeight - 10) : e.clientY
+          host.contextMenu = {
+            visible: true,
+            x,
+            y,
+            song,
+            index
+          }
+        },
+        closeContextMenu: (): void => {
+          if (host.contextMenu.visible) {
+            host.contextMenu = { ...host.contextMenu, visible: false }
+          }
         }
       }
 
@@ -474,6 +513,34 @@ defineComponent(
       }
       document.addEventListener('theme-change', handleThemeChange)
 
+      const handleGlobalClick = (): void => {
+        if (host.contextMenu.visible) {
+          host.actions?.closeContextMenu()
+        }
+      }
+      const handleGlobalContextMenu = (e: MouseEvent): void => {
+        const path = e.composedPath()
+        const isSongRow = path.some((el) => el instanceof HTMLElement && el.hasAttribute('data-song-row'))
+        if (!isSongRow && host.contextMenu.visible) {
+          host.actions?.closeContextMenu()
+        }
+      }
+      const handleGlobalKeyDown = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape' && host.contextMenu.visible) {
+          host.actions?.closeContextMenu()
+        }
+      }
+      const handleGlobalResize = (): void => {
+        if (host.contextMenu.visible) {
+          host.actions?.closeContextMenu()
+        }
+      }
+
+      window.addEventListener('click', handleGlobalClick)
+      window.addEventListener('contextmenu', handleGlobalContextMenu)
+      window.addEventListener('keydown', handleGlobalKeyDown)
+      window.addEventListener('resize', handleGlobalResize)
+
       const volume = Cache.get<number>('play-volume')
       const mode = Cache.get<PlayMode>('play-mode')
       if (volume.isJust()) host.actions.setVolume(volume.value)
@@ -487,6 +554,10 @@ defineComponent(
         document.removeEventListener('add-song', handleAdd)
         document.removeEventListener('edit-song-save', handleEdit)
         document.removeEventListener('theme-change', handleThemeChange)
+        window.removeEventListener('click', handleGlobalClick)
+        window.removeEventListener('contextmenu', handleGlobalContextMenu)
+        window.removeEventListener('keydown', handleGlobalKeyDown)
+        window.removeEventListener('resize', handleGlobalResize)
       }
     },
     render: (host): TemplateResult => {
@@ -752,6 +823,183 @@ defineComponent(
         `
       }
 
+      const getExternalUrl = (s: SongInfo): { label: string; url: string } | null => {
+        if (s.id.length < 36) {
+          return { label: '在网易云音乐打开', url: `https://music.163.com/#/song?id=${s.id}` }
+        }
+        if (s.type === 'qq' && s.value) {
+          return { label: '在QQ音乐打开', url: `https://y.qq.com/n/ryqq/songDetail/${s.value}` }
+        }
+        if (s.type === 'bili' && s.value) {
+          const url = s.value.startsWith('http') ? s.value : `https://www.bilibili.com/video/${s.value}`
+          return { label: '在Bilibili打开', url }
+        }
+        if (s.type === 'youtube' && s.value) {
+          const url = s.value.startsWith('http') ? s.value : `https://www.youtube.com/watch?v=${s.value}`
+          return { label: '在YouTube打开', url }
+        }
+        if (s.type === 'url' && s.value) {
+          return { label: '打开音频直链', url: s.value }
+        }
+        return null
+      }
+
+      const renderContextMenu = () => {
+        if (!host.contextMenu.visible || !host.contextMenu.song) return ''
+        const { song, index, x, y } = host.contextMenu
+        const isCurrent = host.currentIndex === index
+        const isCustom = song.id.length >= 36
+        const external = getExternalUrl(song)
+
+        return html`
+          <div
+            class="fixed z-[150] w-52 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-xl shadow-2xl py-1.5 text-xs text-[var(--lx-text)] select-none backdrop-blur-md"
+            style="top: ${y}px; left: ${x}px;"
+            @click=${(e: Event) => e.stopPropagation()}
+            @contextmenu=${(e: Event) => e.preventDefault()}
+          >
+            <div class="px-3 py-1.5 border-b border-[var(--lx-border)] mb-1">
+              <div class="font-bold truncate">${song.name}</div>
+              <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song.artists.join(' & ')}</div>
+            </div>
+
+            <div
+              @click=${() => {
+                host.actions?.play(index)
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+            >
+              <div class="i-carbon-play-filled-alt text-sm text-[var(--lx-accent)] shrink-0"></div>
+              <span>${isCurrent && host.isPlaying ? '重新播放' : '立即播放'}</span>
+            </div>
+
+            <div
+              @click=${(e: Event) => {
+                if (host.isPlaying && isCurrent) {
+                  showToast('播放中无法编辑当前歌曲', 'warning')
+                } else {
+                  host.actions?.openEditModal(song, e)
+                }
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+            >
+              <div class="i-carbon-edit text-sm opacity-70 shrink-0"></div>
+              <span>编辑源与歌词</span>
+            </div>
+
+            <div class="h-px bg-[var(--lx-border)] my-1"></div>
+
+            <div
+              @click=${() => {
+                navigator.clipboard.writeText(song.name)
+                showToast(`已复制：${song.name}`, 'success')
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+            >
+              <div class="i-carbon-copy text-sm opacity-70 shrink-0"></div>
+              <span>复制歌曲名</span>
+            </div>
+
+            <div
+              @click=${() => {
+                const text = `${song.name} - ${song.artists.join(' & ')}`
+                navigator.clipboard.writeText(text)
+                showToast(`已复制：${text}`, 'success')
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+            >
+              <div class="i-carbon-string-text text-sm opacity-70 shrink-0"></div>
+              <span>复制歌曲与歌手</span>
+            </div>
+
+            ${
+              external
+                ? html`
+              <div
+                @click=${() => {
+                  window.open(external.url, '_blank')
+                  host.actions?.closeContextMenu()
+                }}
+                class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+              >
+                <div class="i-carbon-launch text-sm opacity-70 shrink-0"></div>
+                <span>${external.label}</span>
+              </div>
+            `
+                : ''
+            }
+
+            <div class="h-px bg-[var(--lx-border)] my-1"></div>
+
+            <div
+              @click=${() => {
+                if (index === 0 || host.searchTerm) return
+                if (host.isPlaying) {
+                  showToast('播放中无法调整歌曲', 'warning')
+                } else {
+                  host.actions?.updateSongOrder(song.id, PLAYLIST_SONG_ORDER_GAP * (index - 0.5))
+                }
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 transition-colors ${
+                index === 0 || host.searchTerm
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'cursor-pointer hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]'
+              }"
+            >
+              <div class="i-carbon-arrow-up text-sm opacity-70 shrink-0"></div>
+              <span>向上移动</span>
+            </div>
+
+            <div
+              @click=${() => {
+                if (index === host.playlist.length - 1 || host.searchTerm) return
+                if (host.isPlaying) {
+                  showToast('播放中无法调整歌曲', 'warning')
+                } else {
+                  host.actions?.updateSongOrder(song.id, PLAYLIST_SONG_ORDER_GAP * (index + 1.5))
+                }
+                host.actions?.closeContextMenu()
+              }}
+              class="flex items-center gap-2.5 px-3 py-1.5 transition-colors ${
+                index === host.playlist.length - 1 || host.searchTerm
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'cursor-pointer hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]'
+              }"
+            >
+              <div class="i-carbon-arrow-down text-sm opacity-70 shrink-0"></div>
+              <span>向下移动</span>
+            </div>
+
+            ${
+              isCustom
+                ? html`
+              <div class="h-px bg-[var(--lx-border)] my-1"></div>
+              <div
+                @click=${() => {
+                  if (host.isPlaying) {
+                    showToast('播放中无法删除歌曲', 'warning')
+                  } else {
+                    host.actions?.removeSong(song.id)
+                  }
+                  host.actions?.closeContextMenu()
+                }}
+                class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-red-500/10 text-red-500"
+              >
+                <div class="i-carbon-trash-can text-sm shrink-0"></div>
+                <span>从列表中删除</span>
+              </div>
+            `
+                : ''
+            }
+          </div>
+        `
+      }
+
       return html`
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
@@ -797,7 +1045,7 @@ defineComponent(
         <span class="hidden md:block">类型</span>
         <span class="text-right pr-4">操作</span>
       </div>
-      <div class="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
+      <div class="flex-1 overflow-y-auto no-scrollbar relative min-h-0" @scroll=${() => host.actions?.closeContextMenu()}>
         ${
           host.playlistLoading
             ? html`
@@ -819,9 +1067,11 @@ defineComponent(
               : filteredPlaylist.map(
                   ({ item, originalIndex }) => html`
               <div
+                data-song-row
                 @click=${() => window.matchMedia('(pointer: coarse)').matches && host.actions?.play(originalIndex)}
                 @dblclick=${() => host.actions?.play(originalIndex)}
-                class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === originalIndex ? 'text-[var(--lx-accent)]' : ''}"
+                @contextmenu=${(e: MouseEvent) => host.actions?.openContextMenu(e, item, originalIndex)}
+                class="grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] items-center px-4 py-2.5 group cursor-pointer border-b border-[var(--lx-border)] hover:bg-[var(--lx-hover)] relative ${host.currentIndex === originalIndex ? 'text-[var(--lx-accent)]' : ''} ${host.contextMenu.visible && host.contextMenu.index === originalIndex ? 'bg-[var(--lx-hover)]' : ''}"
               >
                 <div class="flex items-center text-xs opacity-40">
                   <span class="font-mono">${(originalIndex + 1).toString().padStart(2, '0')}</span>
@@ -951,6 +1201,7 @@ defineComponent(
 
       ${host.addModalOpen ? html`<add-song-modal .isOpen=${true} @close=${() => (host.addModalOpen = false)}></add-song-modal>` : ''}
       ${host.editModalOpen && host.editingSong ? html`<edit-song-modal .isOpen=${true} .song=${host.editingSong} @close=${() => (host.editModalOpen = false)}></edit-song-modal>` : ''}
+      ${renderContextMenu()}
       </div>`
     }
   }
