@@ -1,6 +1,6 @@
 # Todo
 
-- [ ] unit tests
+- [x] unit tests
 - [ ] search song by bilibili source automatically
 - [x] fetch music lyrics
 - [ ] desktop lyrics display
