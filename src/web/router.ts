@@ -4,7 +4,6 @@ export function getAppRoute(): AppRoute {
   if (typeof window === 'undefined') return 'playlist'
   const hash = window.location.hash.toLowerCase()
   if (hash.includes('settings')) return 'settings'
-  if (window.location.pathname.endsWith('settings.html')) return 'settings'
   return 'playlist'
 }
 

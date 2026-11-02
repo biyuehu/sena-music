@@ -52,6 +52,22 @@ defineComponent(
       host.colorScheme = getStoredColorScheme()
       host.theme = getStoredTheme()
 
+      const cachedPlaylistId = Cache.get<number>('server-playlist-id')
+      const cachedCacheMaxSize = Cache.get<number>('server-cache-max-size')
+      const hasCached = cachedPlaylistId.isJust() && cachedCacheMaxSize.isJust()
+      if (hasCached) {
+        const cachedSettings = {
+          playlistId: cachedPlaylistId.value,
+          cacheMaxSize: cachedCacheMaxSize.value
+        }
+        host.initial = cachedSettings
+        host.playlistId = cachedSettings.playlistId
+        host.cacheMaxSize = cachedSettings.cacheMaxSize
+        host.loading = false
+      } else {
+        host.loading = true
+      }
+
       httpClient
         .getSettings()
         .then((result) =>
@@ -60,8 +76,14 @@ defineComponent(
               host.initial = settings
               host.playlistId = settings.playlistId
               host.cacheMaxSize = settings.cacheMaxSize
+              Cache.set('server-playlist-id', settings.playlistId, 86400 * 30)
+              Cache.set('server-cache-max-size', settings.cacheMaxSize, 86400 * 30)
             },
-            Left: ({ error }) => showToast(`加载设置失败：${error}`, 'error')
+            Left: ({ error }) => {
+              if (!hasCached) {
+                showToast(`加载设置失败：${error}`, 'error')
+              }
+            }
           })
         )
         .finally(() => {
@@ -99,6 +121,8 @@ defineComponent(
             result.match({
               Right: (settings) => {
                 host.initial = settings
+                Cache.set('server-playlist-id', settings.playlistId, 86400 * 30)
+                Cache.set('server-cache-max-size', settings.cacheMaxSize, 86400 * 30)
                 showToast('设置已保存', 'success')
               },
               Left: ({ error }) => showToast(`保存失败：${error}`, 'error')
@@ -134,7 +158,7 @@ defineComponent(
                   const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
                   applyTheme(next)
                 }}
-                class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors"
+                class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
                 title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
               >
                 <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
@@ -219,9 +243,9 @@ defineComponent(
                                 host.cleaningCache = false
                               })
                           }}
-                          class="mt-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-sm border border-[var(--lx-border)] hover:bg-[var(--lx-hover)] w-fit transition-colors"
+                          class="mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border border-solid border-[var(--lx-border)] text-[var(--lx-text)] shadow-sm hover:shadow transition-all w-fit cursor-pointer active:scale-95 disabled:opacity-50"
                         >
-                          <div class="i-carbon-trash-can ${host.cleaningCache ? 'animate-pulse text-[var(--lx-accent)]' : ''}"></div>
+                          <div class="i-carbon-trash-can text-sm opacity-70 ${host.cleaningCache ? 'animate-pulse' : ''}"></div>
                           <span>${host.cleaningCache ? '清理中...' : '一键清理'}</span>
                         </button>
                       </div>

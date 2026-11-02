@@ -33,7 +33,7 @@ interface ContextMenuState {
 }
 
 interface PlayerActions {
-  play: (index: number, onlyLoad?: boolean) => Promise<void>
+  play: (index: number, onlyLoad?: boolean, startTime?: number) => Promise<void>
   toggle: () => void
   next: (isAuto?: boolean) => void
   prev: () => void
@@ -126,9 +126,11 @@ defineComponent(
                 const index = parseInt(indexStr, 10)
                 if (Number.isNaN(index) || index < 0 || index >= playlist.length || playlist[index].name !== name) {
                   Cache.remove('play-song')
+                  Cache.remove('play-time')
                   return
                 }
-                host.actions?.play(index, true)
+                const savedTime = Math.max(0, Cache.get<number>('play-time').unwrapOr(0))
+                host.actions?.play(index, true, savedTime)
               },
               Left: ({ error }) => {
                 console.error('Failed to load playlist:', error)
@@ -167,7 +169,7 @@ defineComponent(
       }
 
       const actions: PlayerActions = {
-        play: async (index: number, onlyLoad = false): Promise<void> => {
+        play: async (index: number, onlyLoad = false, startTime = 0): Promise<void> => {
           host.showVolumeBar = false
           if (index < 0 || index >= host.playlist.length) return
           if (host.playErrorTimeout !== null) {
@@ -178,6 +180,12 @@ defineComponent(
           audio.currentTime = 0
           audio.pause()
           host.currentIndex = index
+
+          if (startTime > 0) {
+            host.currentTime = formatTime(startTime)
+          } else {
+            Cache.set('play-time', 0)
+          }
 
           // 异步加载三轨歌词
           const currentSong = host.playlist[index]
@@ -197,7 +205,8 @@ defineComponent(
                   )
                   host.lyricStatus = host.lyrics.length > 0 ? 'ok' : 'no_lyric'
                   if (host.lyrics.length > 0) {
-                    host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+                    const checkTime = audio.currentTime > 0 ? audio.currentTime : startTime
+                    host.activeLyricIndex = findActiveLyricIndex(host.lyrics, checkTime)
                     setTimeout(() => host.actions?.scrollToActiveLyric(false), 60)
                   }
                 } else if (lyricRes.status === 'pure_music') {
@@ -222,6 +231,28 @@ defineComponent(
             audio.pause()
             audio.src = audioUrl.value
             audio.load()
+            if (startTime > 0) {
+              const applyStartTime = () => {
+                audio.removeEventListener('loadedmetadata', applyStartTime)
+                audio.removeEventListener('canplay', applyStartTime)
+                if (startTime > 0 && (Number.isNaN(audio.duration) || startTime < audio.duration)) {
+                  try {
+                    audio.currentTime = startTime
+                  } catch {}
+                  if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+                    host.progress = (audio.currentTime / audio.duration) * 100 || 0
+                    host.currentTime = formatTime(audio.currentTime)
+                    host.duration = formatTime(audio.duration)
+                  }
+                  if (host.lyrics.length > 0) {
+                    host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+                    setTimeout(() => host.actions?.scrollToActiveLyric(false), 60)
+                  }
+                }
+              }
+              audio.addEventListener('loadedmetadata', applyStartTime, { once: true })
+              audio.addEventListener('canplay', applyStartTime, { once: true })
+            }
             if (onlyLoad) return
             await audio.play()
             host.isPlaying = true
@@ -283,6 +314,7 @@ defineComponent(
         seek: (e: Known): void => {
           host.showVolumeBar = false
           audio.currentTime = (parseFloat(e.target.value) / 100) * audio.duration
+          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
           host.isUserScrollingLyrics = false
           if (host.lyrics.length > 0) {
             host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
@@ -364,6 +396,7 @@ defineComponent(
         },
         seekToTime: (time: number): void => {
           audio.currentTime = time
+          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
           host.isUserScrollingLyrics = false
           if (host.lyrics.length > 0) {
             host.activeLyricIndex = findActiveLyricIndex(host.lyrics, time)
@@ -432,11 +465,20 @@ defineComponent(
       }
 
       host.actions = actions
+      let lastSavedProgressTime = 0
+      const savePlaybackProgress = (time: number): void => {
+        if (Math.abs(time - lastSavedProgressTime) >= 1) {
+          lastSavedProgressTime = time
+          Cache.set('play-time', Math.floor(time * 10) / 10)
+        }
+      }
+
       audio.ontimeupdate = (): void => {
         if (!host.isDragging && !Number.isNaN(audio.duration)) {
           host.progress = (audio.currentTime / audio.duration) * 100 || 0
           host.currentTime = formatTime(audio.currentTime)
           host.duration = formatTime(audio.duration)
+          savePlaybackProgress(audio.currentTime)
         }
 
         if (host.lyrics.length > 0) {
@@ -449,7 +491,13 @@ defineComponent(
           }
         }
       }
+      audio.onpause = (): void => {
+        if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
+          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
+        }
+      }
       audio.onended = (): void => {
+        Cache.set('play-time', 0)
         if (host.playMode === 'single-loop') {
           audio.currentTime = 0
           audio.play()
@@ -548,6 +596,13 @@ defineComponent(
 
       window.addEventListener('hashchange', handleRouteChange)
       window.addEventListener('popstate', handleRouteChange)
+      const handleBeforeUnload = (): void => {
+        if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
+          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
+        }
+      }
+
+      window.addEventListener('beforeunload', handleBeforeUnload)
       window.addEventListener('click', handleGlobalClick)
       window.addEventListener('contextmenu', handleGlobalContextMenu)
       window.addEventListener('keydown', handleGlobalKeyDown)
@@ -568,6 +623,7 @@ defineComponent(
         document.removeEventListener('theme-change', handleThemeChange)
         window.removeEventListener('hashchange', handleRouteChange)
         window.removeEventListener('popstate', handleRouteChange)
+        window.removeEventListener('beforeunload', handleBeforeUnload)
         window.removeEventListener('click', handleGlobalClick)
         window.removeEventListener('contextmenu', handleGlobalContextMenu)
         window.removeEventListener('keydown', handleGlobalKeyDown)
@@ -867,11 +923,20 @@ defineComponent(
 
         return html`
           <div
-            class="fixed z-[150] w-52 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-xl shadow-2xl py-1.5 text-xs text-[var(--lx-text)] select-none backdrop-blur-md"
+            class="song-context-menu fixed z-[150] w-52 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-xl shadow-2xl py-1.5 text-xs text-[var(--lx-text)] select-none backdrop-blur-md"
             style="top: ${y}px; left: ${x}px;"
             @click=${(e: Event) => e.stopPropagation()}
             @contextmenu=${(e: Event) => e.preventDefault()}
           >
+            <style>
+              .song-context-menu [class^="i-"],
+              .song-context-menu [class*=" i-"] {
+                filter: var(--lx-icon-filter, none) !important;
+              }
+              .song-context-menu .i-carbon-trash-can {
+                filter: invert(40%) sepia(90%) saturate(2500%) hue-rotate(335deg) brightness(1.1) !important;
+              }
+            </style>
             <div class="px-3 py-1.5 border-b border-[var(--lx-border)] mb-1">
               <div class="font-bold truncate">${song.name}</div>
               <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song.artists.join(' & ')}</div>
@@ -882,9 +947,9 @@ defineComponent(
                 host.actions?.play(index)
                 host.actions?.closeContextMenu()
               }}
-              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)]"
             >
-              <div class="i-carbon-play-filled-alt text-sm text-[var(--lx-accent)] shrink-0"></div>
+              <div class="i-carbon-play-filled-alt text-sm opacity-70 shrink-0"></div>
               <span>${isCurrent && host.isPlaying ? '重新播放' : '立即播放'}</span>
             </div>
 
@@ -897,7 +962,7 @@ defineComponent(
                 }
                 host.actions?.closeContextMenu()
               }}
-              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)]"
             >
               <div class="i-carbon-edit text-sm opacity-70 shrink-0"></div>
               <span>编辑源与歌词</span>
@@ -911,7 +976,7 @@ defineComponent(
                 showToast(`已复制：${song.name}`, 'success')
                 host.actions?.closeContextMenu()
               }}
-              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)]"
             >
               <div class="i-carbon-copy text-sm opacity-70 shrink-0"></div>
               <span>复制歌曲名</span>
@@ -924,7 +989,7 @@ defineComponent(
                 showToast(`已复制：${text}`, 'success')
                 host.actions?.closeContextMenu()
               }}
-              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+              class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)]"
             >
               <div class="i-carbon-string-text text-sm opacity-70 shrink-0"></div>
               <span>复制歌曲与歌手</span>
@@ -938,7 +1003,7 @@ defineComponent(
                   window.open(external.url, '_blank')
                   host.actions?.closeContextMenu()
                 }}
-                class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]"
+                class="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer transition-colors hover:bg-[var(--lx-hover)]"
               >
                 <div class="i-carbon-launch text-sm opacity-70 shrink-0"></div>
                 <span>${external.label}</span>
@@ -962,7 +1027,7 @@ defineComponent(
               class="flex items-center gap-2.5 px-3 py-1.5 transition-colors ${
                 index === 0 || host.searchTerm
                   ? 'opacity-30 cursor-not-allowed'
-                  : 'cursor-pointer hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]'
+                  : 'cursor-pointer hover:bg-[var(--lx-hover)]'
               }"
             >
               <div class="i-carbon-arrow-up text-sm opacity-70 shrink-0"></div>
@@ -982,7 +1047,7 @@ defineComponent(
               class="flex items-center gap-2.5 px-3 py-1.5 transition-colors ${
                 index === host.playlist.length - 1 || host.searchTerm
                   ? 'opacity-30 cursor-not-allowed'
-                  : 'cursor-pointer hover:bg-[var(--lx-hover)] hover:text-[var(--lx-accent)]'
+                  : 'cursor-pointer hover:bg-[var(--lx-hover)]'
               }"
             >
               <div class="i-carbon-arrow-down text-sm opacity-70 shrink-0"></div>
@@ -1017,11 +1082,9 @@ defineComponent(
       return html`
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
-      ${
-        host.currentRoute === 'settings'
-          ? html`<settings-page class="flex-1 min-h-0 overflow-hidden flex flex-col"></settings-page>`
-          : html`
-      <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
+      <settings-page class="${host.currentRoute === 'settings' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></settings-page>
+      <div class="${host.currentRoute === 'playlist' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}">
+        <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
         <div class="relative flex-1 max-w-sm min-w-[200px] hidden xl:block mr-auto">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--lx-text-muted)]">
             <div class="i-carbon-search"></div>
@@ -1049,7 +1112,7 @@ defineComponent(
               const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
               applyTheme(next)
             }}
-            class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] hover:text-[var(--lx-accent)] transition-colors"
+            class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
             title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
           >
             <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
@@ -1141,8 +1204,7 @@ defineComponent(
                 )
         }
       </div>
-          `
-      }
+      </div>
       <footer class="flex-none h-24 md:h-20 border-t border-[var(--lx-border)] bg-[var(--lx-bg-alt)] px-4 flex items-center">
         ${commonControls(false)}
       </footer>
