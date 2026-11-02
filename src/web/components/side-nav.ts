@@ -1,15 +1,15 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
 import packageJson from '../../../package.json'
+import { type AppRoute, getAppRoute, navigateTo } from '../router'
 import { getEffectiveTheme, initTheme } from '../theme'
-
-const activeItem = location.pathname.endsWith('settings.html') ? 'settings' : 'playlist'
 
 export const sideNav = defineComponent(
   'side-nav',
   {
     isDrawerOpen: State(false),
-    isDark: State(getEffectiveTheme() === 'dark')
+    isDark: State(getEffectiveTheme() === 'dark'),
+    activeRoute: State<AppRoute>(getAppRoute())
   },
   {
     useGlobalStyles: true,
@@ -44,9 +44,17 @@ export const sideNav = defineComponent(
         host.isDark = customEvent.detail.effective === 'dark'
       }
 
+      const handleRouteChange = (): void => {
+        host.activeRoute = getAppRoute()
+      }
+
       document.addEventListener('theme-change', handleThemeChange)
+      window.addEventListener('hashchange', handleRouteChange)
+      window.addEventListener('popstate', handleRouteChange)
       return () => {
         document.removeEventListener('theme-change', handleThemeChange)
+        window.removeEventListener('hashchange', handleRouteChange)
+        window.removeEventListener('popstate', handleRouteChange)
       }
     },
     render: (host) => html`
@@ -92,13 +100,19 @@ export const sideNav = defineComponent(
           </div>
         </div>
         <div class="flex-1 px-2 space-y-1">
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${activeItem === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
-               @click=${() => (window.location.href = 'index.html')}>
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+               @click=${() => {
+                 navigateTo('playlist')
+                 host.isDrawerOpen = false
+               }}>
             <div class="i-carbon-list shrink-0"></div>
             <span>主页</span>
           </div>
-          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${activeItem === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
-               @click=${() => (window.location.href = 'settings.html')}>
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+               @click=${() => {
+                 navigateTo('settings')
+                 host.isDrawerOpen = false
+               }}>
             <div class="i-carbon-settings shrink-0"></div>
             <span>设置</span>
           </div>

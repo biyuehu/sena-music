@@ -124,7 +124,7 @@ defineComponent(
       ]
 
       return html`
-        <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
+        <div class="flex flex-col flex-1 h-full min-h-0 bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
           <main class="flex-1 flex flex-col min-w-0 min-h-0">
             <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
               <span class="font-bold text-sm">设置</span>

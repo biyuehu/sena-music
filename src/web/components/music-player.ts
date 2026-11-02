@@ -1,5 +1,6 @@
 import './add-song-modal'
 import './edit-song-modal'
+import './settings-page'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
@@ -16,6 +17,7 @@ import {
   type ParsedLyricLine,
   saveStoredLyricPreference
 } from '../lyric'
+import { type AppRoute, getAppRoute } from '../router'
 import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
 import { showToast } from './toast'
@@ -93,7 +95,8 @@ defineComponent(
       y: 0,
       song: null,
       index: -1
-    })
+    }),
+    currentRoute: State<AppRoute>(getAppRoute())
   },
   {
     useGlobalStyles: true,
@@ -536,6 +539,15 @@ defineComponent(
         }
       }
 
+      const handleRouteChange = (): void => {
+        host.currentRoute = getAppRoute()
+        if (host.contextMenu.visible) {
+          host.actions?.closeContextMenu()
+        }
+      }
+
+      window.addEventListener('hashchange', handleRouteChange)
+      window.addEventListener('popstate', handleRouteChange)
       window.addEventListener('click', handleGlobalClick)
       window.addEventListener('contextmenu', handleGlobalContextMenu)
       window.addEventListener('keydown', handleGlobalKeyDown)
@@ -554,6 +566,8 @@ defineComponent(
         document.removeEventListener('add-song', handleAdd)
         document.removeEventListener('edit-song-save', handleEdit)
         document.removeEventListener('theme-change', handleThemeChange)
+        window.removeEventListener('hashchange', handleRouteChange)
+        window.removeEventListener('popstate', handleRouteChange)
         window.removeEventListener('click', handleGlobalClick)
         window.removeEventListener('contextmenu', handleGlobalContextMenu)
         window.removeEventListener('keydown', handleGlobalKeyDown)
@@ -1003,6 +1017,10 @@ defineComponent(
       return html`
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
+      ${
+        host.currentRoute === 'settings'
+          ? html`<settings-page class="flex-1 min-h-0 overflow-hidden flex flex-col"></settings-page>`
+          : html`
       <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
         <div class="relative flex-1 max-w-sm min-w-[200px] hidden xl:block mr-auto">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--lx-text-muted)]">
@@ -1123,6 +1141,8 @@ defineComponent(
                 )
         }
       </div>
+          `
+      }
       <footer class="flex-none h-24 md:h-20 border-t border-[var(--lx-border)] bg-[var(--lx-bg-alt)] px-4 flex items-center">
         ${commonControls(false)}
       </footer>

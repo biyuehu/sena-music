@@ -1,41 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>设置 - Sena Music</title>
   <script>
-    try {
-      const raw = localStorage.getItem('sena-cache:theme');
-      let theme = null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.time > Date.now()) theme = parsed.value;
-      }
-      if (theme === 'dark' || ((!theme || theme === 'auto') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.setAttribute('data-theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.setAttribute('data-theme', 'light');
-      }
-    } catch { }
+    window.location.replace('index.html#/settings');
   </script>
-  <link rel="stylesheet" href="../styles/uno.css">
-  <link rel="stylesheet" href="../styles/index.css">
 </head>
-
 <body>
-  <toast-container></toast-container>
-  <div id="app"
-    class="flex h-dvh overflow-hidden absolute top-0 right-0 bottom-0 left-0 select-none">
-    <side-nav></side-nav>
-    <settings-page></settings-page>
-  </div>
-  <script type="module" src="../components/toast.ts"></script>
-  <script type="module" src="../components/side-nav.ts"></script>
-  <script type="module" src="../components/settings-page.ts"></script>
 </body>
-
 </html>
