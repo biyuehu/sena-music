@@ -39,8 +39,7 @@ export const ThemeToggle = defineComponent(
         applyTheme(next)
       }
       const title = `切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}`
-      const icon =
-        host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'
+      const icon = host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-screen'
 
       return html`
         <button
