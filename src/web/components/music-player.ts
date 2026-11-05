@@ -48,6 +48,7 @@ interface PlayerActions {
   updateSongOrder: (id: string, newIndex: number) => void
   removeSong: (id: string) => void
   seekToTime: (time: number) => void
+  seekToRatio: (ratio: number, previewOnly?: boolean) => void
   scrollToActiveLyric: (smooth?: boolean) => void
   handleLyricScroll: () => void
   openContextMenu: (e: MouseEvent, song: SongInfo, index: number) => void
@@ -349,14 +350,28 @@ defineComponent(
           host.playMode = modes[(modes.indexOf(host.playMode) + 1) % modes.length]
           Cache.set('play-mode', host.playMode)
         },
-        seek: (e: Known): void => {
+        seekToRatio: (ratio: number, previewOnly = false): void => {
           host.showVolumeBar = false
-          audio.currentTime = (parseFloat(e.target.value) / 100) * audio.duration
-          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
-          host.isUserScrollingLyrics = false
-          if (host.lyrics.length > 0) {
-            host.activeLyricIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
-            setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
+          const boundedRatio = Math.max(0, Math.min(1, ratio))
+          host.progress = boundedRatio * 100
+          if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+            const targetTime = boundedRatio * audio.duration
+            host.currentTime = formatTime(targetTime)
+            if (!previewOnly) {
+              audio.currentTime = targetTime
+              Cache.set('play-time', Math.floor(targetTime * 10) / 10)
+              host.isUserScrollingLyrics = false
+              if (host.lyrics.length > 0) {
+                host.activeLyricIndex = findActiveLyricIndex(host.lyrics, targetTime)
+                setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
+              }
+            }
+          }
+        },
+        seek: (e: Known): void => {
+          const val = parseFloat(e?.target?.value ?? e)
+          if (!Number.isNaN(val)) {
+            host.actions?.seekToRatio(val / 100, false)
           }
         },
         setVolume: (val: number): void => {
@@ -717,21 +732,55 @@ defineComponent(
 
         return html`
     <div class="flex flex-col gap-3 w-full">
-      <div class="group relative h-1.5 bg-[var(--lx-border)] cursor-pointer w-full rounded-full">
-        <input type="range" min="0" max="100" step="0.1" .value=${host.progress.toString()}
-               @mousedown=${() => {
-                 host.isDragging = true
-               }}
-               @mouseup=${(e: Known) => {
-                 host.isDragging = false
-                 host.actions?.seek(e)
-               }}
-               @input=${(e: Known) => {
-                 host.progress = parseFloat(e.target.value)
-               }}
-               class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer" />
-        <div class="absolute h-full bg-[var(--lx-accent)] pointer-events-none rounded-full" style="width: ${host.progress}%">
-          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md scale-0 group-hover:scale-100 transition-transform border border-[var(--lx-accent)]"></div>
+      <div
+        class="group relative py-2.5 -my-2 flex items-center cursor-pointer w-full select-none touch-none"
+        @pointerdown=${(e: PointerEvent) => {
+          e.preventDefault()
+          const track = e.currentTarget as HTMLElement
+          track.setPointerCapture(e.pointerId)
+          host.isDragging = true
+          host.showVolumeBar = false
+          const rect = track.getBoundingClientRect()
+          const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          host.actions?.seekToRatio(ratio, true)
+        }}
+        @pointermove=${(e: PointerEvent) => {
+          if (!host.isDragging) return
+          const track = e.currentTarget as HTMLElement
+          const rect = track.getBoundingClientRect()
+          const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          host.actions?.seekToRatio(ratio, true)
+        }}
+        @pointerup=${(e: PointerEvent) => {
+          if (!host.isDragging) return
+          const track = e.currentTarget as HTMLElement
+          try {
+            track.releasePointerCapture(e.pointerId)
+          } catch {}
+          const rect = track.getBoundingClientRect()
+          const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+          host.actions?.seekToRatio(ratio, false)
+          host.isDragging = false
+        }}
+        @pointercancel=${(e: PointerEvent) => {
+          if (!host.isDragging) return
+          const track = e.currentTarget as HTMLElement
+          try {
+            track.releasePointerCapture(e.pointerId)
+          } catch {}
+          host.isDragging = false
+        }}
+      >
+        <div class="relative h-1.5 w-full bg-[var(--lx-border)] rounded-full overflow-visible pointer-events-none">
+          <div class="absolute top-0 left-0 h-full bg-[var(--lx-accent)] rounded-full" style="width: ${host.progress}%"></div>
+          <div
+            class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-md border-2 border-[var(--lx-accent)] transition-transform ${
+              host.isDragging
+                ? 'scale-125'
+                : 'scale-0 group-hover:scale-100 sm:scale-0 sm:group-hover:scale-100 max-sm:scale-100'
+            }"
+            style="left: ${host.progress}%"
+          ></div>
         </div>
       </div>
 
@@ -763,14 +812,41 @@ defineComponent(
                  @click=${(e: Event) => e.stopPropagation()}>
               
               <div class="flex items-center gap-3 w-40">
-                <div class="relative flex-1 h-1 bg-[var(--lx-border)] rounded-full">
-                  <div class="absolute h-full bg-[var(--lx-accent)] rounded-full" style="width: ${host.volume * 100}%"></div>
-                  <input type="range" min="0" max="1" step="0.001" 
-                         .value=${host.volume.toString()}
-                         @input=${(e: Known) => host.actions?.setVolume(parseFloat(e.target.value))}
-                         class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                  <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border border-[var(--lx-accent)] rounded-full shadow-sm pointer-events-none"
-                       style="left: calc(${host.volume * 100}% - 6px)"></div>
+                <div
+                  class="relative flex-1 py-2.5 -my-2 flex items-center cursor-pointer select-none touch-none"
+                  @pointerdown=${(e: PointerEvent) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const track = e.currentTarget as HTMLElement
+                    track.setPointerCapture(e.pointerId)
+                    const rect = track.getBoundingClientRect()
+                    const vol = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                    host.actions?.setVolume(Math.round(vol * 1000) / 1000)
+                  }}
+                  @pointermove=${(e: PointerEvent) => {
+                    if ((e.buttons & 1) === 0) return
+                    const track = e.currentTarget as HTMLElement
+                    const rect = track.getBoundingClientRect()
+                    const vol = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                    host.actions?.setVolume(Math.round(vol * 1000) / 1000)
+                  }}
+                  @pointerup=${(e: PointerEvent) => {
+                    const track = e.currentTarget as HTMLElement
+                    try {
+                      track.releasePointerCapture(e.pointerId)
+                    } catch {}
+                    const rect = track.getBoundingClientRect()
+                    const vol = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                    host.actions?.setVolume(Math.round(vol * 1000) / 1000)
+                  }}
+                >
+                  <div class="relative w-full h-1 bg-[var(--lx-border)] rounded-full pointer-events-none">
+                    <div class="absolute top-0 left-0 h-full bg-[var(--lx-accent)] rounded-full" style="width: ${host.volume * 100}%"></div>
+                    <div
+                      class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-2 border-[var(--lx-accent)] rounded-full shadow-sm pointer-events-none"
+                      style="left: ${host.volume * 100}%"
+                    ></div>
+                  </div>
                 </div>
                 <span class="font-mono text-[10px] font-bold opacity-60 w-8 text-right">${Math.round(host.volume * 100)}%</span>
               </div>
