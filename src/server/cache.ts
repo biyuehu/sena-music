@@ -1,24 +1,30 @@
-import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { logger } from './common'
 import { Data } from './data'
 
 export function getCacheInfo(): { path: string; sizeBytes: number } {
-  if (!existsSync(Data.CACHE_DIRECTORY)) {
-    return { path: Data.CACHE_DIRECTORY, sizeBytes: 0 }
+  const cachePath = resolve(Data.CACHE_DIRECTORY)
+  if (!existsSync(cachePath)) {
+    try {
+      mkdirSync(cachePath, { recursive: true })
+    } catch {
+      // ignore
+    }
+    return { path: cachePath, sizeBytes: 0 }
   }
   let totalSize = 0
-  const allFiles = readdirSync(Data.CACHE_DIRECTORY)
+  const allFiles = readdirSync(cachePath)
   for (const name of allFiles) {
     if (name.endsWith('.lock')) continue
     try {
-      const stat = statSync(join(Data.CACHE_DIRECTORY, name))
+      const stat = statSync(join(cachePath, name))
       totalSize += stat.size
     } catch {
       // ignore
     }
   }
-  return { path: Data.CACHE_DIRECTORY, sizeBytes: totalSize }
+  return { path: cachePath, sizeBytes: totalSize }
 }
 
 export function pruneCache(maxSizeBytes: number): void {

@@ -5,6 +5,7 @@ import { defineComponent, State } from '@/romi/web'
 import type { Settings } from '../../common/types'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
+import { getAppRoute } from '../router'
 import {
   applyColorScheme,
   applyTheme,
@@ -92,15 +93,29 @@ defineComponent(
           host.loading = false
         })
 
-      httpClient.getCacheInfo().then((result) =>
-        result.match({
-          Right: (info) => {
-            host.cacheSize = info.sizeBytes
-            host.cachePath = info.path
-          },
-          Left: ({ error }) => showToast(`加载缓存信息失败：${error}`, 'error')
-        })
-      )
+      const loadCacheInfo = (): void => {
+        httpClient.getCacheInfo().then((result) =>
+          result.match({
+            Right: (info) => {
+              host.cacheSize = info.sizeBytes
+              host.cachePath = info.path
+            },
+            Left: ({ error }) => {
+              if (getAppRoute() === 'settings') {
+                showToast(`加载缓存信息失败：${error}`, 'error')
+              }
+            }
+          })
+        )
+      }
+
+      loadCacheInfo()
+
+      const handleRouteChange = (): void => {
+        if (getAppRoute() === 'settings') {
+          loadCacheInfo()
+        }
+      }
 
       const handleThemeChange = (e: Event): void => {
         const detail = (e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>).detail
@@ -108,7 +123,13 @@ defineComponent(
         host.theme = detail.theme as Theme
       }
       document.addEventListener('theme-change', handleThemeChange)
-      return () => document.removeEventListener('theme-change', handleThemeChange)
+      window.addEventListener('hashchange', handleRouteChange)
+      window.addEventListener('popstate', handleRouteChange)
+      return () => {
+        document.removeEventListener('theme-change', handleThemeChange)
+        window.removeEventListener('hashchange', handleRouteChange)
+        window.removeEventListener('popstate', handleRouteChange)
+      }
     },
     render: (host): TemplateResult => {
       const changed = host.playlistId !== host.initial.playlistId || host.cacheMaxSize !== host.initial.cacheMaxSize
@@ -226,6 +247,7 @@ defineComponent(
                                 result.match({
                                   Right: (info) => {
                                     host.cacheSize = info.sizeBytes
+                                    host.cachePath = info.path
                                     showToast('清理成功', 'success')
                                   },
                                   Left: ({ error }) => showToast(`清理失败：${error}`, 'error')

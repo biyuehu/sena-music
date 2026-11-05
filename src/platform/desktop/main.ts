@@ -5,6 +5,8 @@ import { app, BrowserWindow } from 'electron'
 function preparePackagedEnvironment(): void {
   const userData = app.getPath('userData')
   mkdirSync(userData, { recursive: true })
+  mkdirSync(join(userData, 'cache'), { recursive: true })
+  mkdirSync(join(userData, 'data'), { recursive: true })
   const configFile = join(userData, 'music.toml')
   if (!existsSync(configFile)) copyFileSync(join(process.resourcesPath, 'music.toml'), configFile)
   process.chdir(userData)
