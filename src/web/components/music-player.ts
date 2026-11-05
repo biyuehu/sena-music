@@ -20,6 +20,7 @@ import {
 import { type AppRoute, getAppRoute } from '../router'
 import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
+import { AudioVisualizer } from '../visualizer'
 import { showToast } from './toast'
 
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
@@ -96,7 +97,9 @@ defineComponent(
       song: null,
       index: -1
     }),
-    currentRoute: State<AppRoute>(getAppRoute())
+    currentRoute: State<AppRoute>(getAppRoute()),
+    visualizer: Ref<AudioVisualizer | null>(null),
+    visualizerEnabled: State<boolean>(Cache.get<boolean>('visualizer-enabled').unwrapOr(true))
   },
   {
     useGlobalStyles: true,
@@ -149,11 +152,43 @@ defineComponent(
       audio.volume = host.volume
       let lyricScrollTimeout: NodeJS.Timeout | null = null
 
+      const ensureVisualizer = (): void => {
+        if (!host.visualizerEnabled || !host.isFullscreen) {
+          if (host.visualizer) host.visualizer.setFullscreen(false)
+          return
+        }
+        const root = host.shadowRoot
+        if (!root) return
+        const canvas = root.getElementById('fullscreen-visualizer-canvas') as HTMLCanvasElement | null
+        if (!canvas) return
+
+        if (!host.visualizer) {
+          host.visualizer = new AudioVisualizer({ canvas, audio })
+        } else {
+          host.visualizer.attachCanvas(canvas)
+        }
+        host.visualizer.setFullscreen(true)
+        host.visualizer.setPlaying(host.isPlaying)
+      }
+
+      const handleVisualizerToggle = (e: Event): void => {
+        const detail = (e as CustomEvent<{ enabled: boolean }>).detail
+        host.visualizerEnabled = detail.enabled
+        if (host.visualizer) {
+          host.visualizer.setEnabled(detail.enabled)
+        }
+        if (detail.enabled && host.isFullscreen) {
+          setTimeout(ensureVisualizer, 60)
+        }
+      }
+      document.addEventListener('visualizer-toggle', handleVisualizerToggle)
+
       const handlePlayError = (index: number, error?: string): void => {
         const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
         const shouldAutoNext =
           autoNextEnabled && host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
+        if (host.visualizer) host.visualizer.setPlaying(false)
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
         if (error) console.error(`Failed to play song ${index}:`, error)
         if (shouldAutoNext) {
@@ -256,6 +291,7 @@ defineComponent(
             if (onlyLoad) return
             await audio.play()
             host.isPlaying = true
+            if (host.visualizer) host.visualizer.setPlaying(true)
             Cache.set('play-song', `${host.currentIndex}|${host.playlist[host.currentIndex].name}`)
           } catch (err) {
             console.error('Failed to play:', err)
@@ -276,12 +312,14 @@ defineComponent(
             host.isUserManuallyPlaying = false
             audio.pause()
             host.isPlaying = false
+            if (host.visualizer) host.visualizer.setPlaying(false)
           } else {
             host.isUserManuallyPlaying = true
             audio
               .play()
               .then(() => {
                 host.isPlaying = true
+                if (host.visualizer) host.visualizer.setPlaying(true)
               })
               .catch(() => handlePlayError(host.currentIndex))
           }
@@ -331,7 +369,10 @@ defineComponent(
           if (host.isFullscreen) {
             setTimeout(() => {
               host.actions?.scrollToActiveLyric(false)
+              ensureVisualizer()
             }, 60)
+          } else if (host.visualizer) {
+            host.visualizer.setFullscreen(false)
           }
         },
         openEditModal: (song, e): void => {
@@ -492,6 +533,7 @@ defineComponent(
         }
       }
       audio.onpause = (): void => {
+        if (host.visualizer) host.visualizer.setPlaying(false)
         if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
           Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
         }
@@ -614,6 +656,11 @@ defineComponent(
       if (mode.isJust()) host.playMode = mode.value
 
       return (): void => {
+        document.removeEventListener('visualizer-toggle', handleVisualizerToggle)
+        if (host.visualizer) {
+          host.visualizer.destroy()
+          host.visualizer = null
+        }
         audio.pause()
         audio.src = ''
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
@@ -1212,12 +1259,20 @@ defineComponent(
 
     <!-- 全屏沉浸式播放器（含多语言三轨歌词） -->
     <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
+      ${
+        host.visualizerEnabled
+          ? html`<canvas
+              id="fullscreen-visualizer-canvas"
+              class="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-75"
+            ></canvas>`
+          : ''
+      }
       <button @click=${() => host.actions?.toggleFullscreen()}
-        class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-10">
+        class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-20">
       </button>
 
       <!-- 移动端视图（支持点击切换封面/歌词模式） -->
-      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-12 pb-6 overflow-hidden relative">
+      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-12 pb-6 overflow-hidden relative z-10">
         <div class="flex justify-between items-center shrink-0 py-2 z-20">
           <button
             @click=${() => {
@@ -1260,7 +1315,7 @@ defineComponent(
       </div>
 
       <!-- 桌面端视图（左侧封面+控制，右侧沉浸式三轨歌词视窗） -->
-      <div class="hidden md:flex w-full max-w-6xl h-full max-h-[85vh] px-12 flex-row items-center justify-between gap-16">
+      <div class="hidden md:flex w-full max-w-6xl h-full max-h-[85vh] px-12 flex-row items-center justify-between gap-16 relative z-10">
         <div class="flex flex-col gap-8 w-[380px] shrink-0">
           ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
           <div class="flex flex-col gap-1">

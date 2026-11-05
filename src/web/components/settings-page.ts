@@ -32,7 +32,8 @@ defineComponent(
     theme: State<Theme>('auto'),
     cacheSize: State(0),
     cachePath: State(''),
-    cleaningCache: State(false)
+    cleaningCache: State(false),
+    visualizerEnabled: State(true)
   },
   {
     useGlobalStyles: true,
@@ -49,6 +50,7 @@ defineComponent(
       initTheme()
       host.apiBaseUrl = Cache.get<string>('api-base-url').unwrapOr('')
       host.autoNextOnError = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
+      host.visualizerEnabled = Cache.get<boolean>('visualizer-enabled').unwrapOr(true)
       host.colorScheme = getStoredColorScheme()
       host.theme = getStoredTheme()
 
@@ -263,6 +265,25 @@ defineComponent(
                           @change=${(e: Event) => {
                             host.autoNextOnError = (e.target as HTMLInputElement).checked
                             Cache.set('auto-next-on-error', host.autoNextOnError, 86400 * 365)
+                          }}
+                        />
+                      </label>
+
+                      <label class="flex items-center justify-between gap-3 cursor-pointer">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-xs font-bold opacity-70">全屏音频可视化背景</span>
+                          <span class="text-[11px] opacity-40">在全屏播放器背景显示随音乐律动的动态光影效果</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          class="w-4 h-4 cursor-pointer"
+                          .checked=${host.visualizerEnabled}
+                          @change=${(e: Event) => {
+                            host.visualizerEnabled = (e.target as HTMLInputElement).checked
+                            Cache.set('visualizer-enabled', host.visualizerEnabled, 86400 * 365)
+                            document.dispatchEvent(
+                              new CustomEvent('visualizer-toggle', { detail: { enabled: host.visualizerEnabled } })
+                            )
                           }}
                         />
                       </label>
