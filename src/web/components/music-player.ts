@@ -1,6 +1,7 @@
 import './add-song-modal'
 import './edit-song-modal'
 import './settings-page'
+import './theme-toggle'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
@@ -18,7 +19,6 @@ import {
   saveStoredLyricPreference
 } from '../lyric'
 import { type AppRoute, getAppRoute } from '../router'
-import { applyTheme, getEffectiveTheme, getStoredTheme, initTheme, type Theme } from '../theme'
 import { formatTime, getSongUrl } from '../utils'
 import { AudioVisualizer } from '../visualizer'
 import { showToast } from './toast'
@@ -82,9 +82,7 @@ defineComponent(
     playErrorTimeout: Ref<NodeJS.Timeout | null>(null),
     isUserManuallyPlaying: Ref<boolean>(false),
     coverErrorMap: State<Record<string, boolean>>({}),
-    isDark: State(getEffectiveTheme() === 'dark'),
     searchTerm: State<string>(''),
-    theme: State<Theme>('auto'),
     lyrics: State<ParsedLyricLine[]>([]),
     lyricStatus: State<'loading' | 'ok' | 'pure_music' | 'no_lyric'>('loading'),
     activeLyricIndex: State<number>(-1),
@@ -612,15 +610,6 @@ defineComponent(
       document.addEventListener('add-song', handleAdd)
       document.addEventListener('edit-song-save', handleEdit)
 
-      initTheme()
-      host.theme = getStoredTheme()
-      const handleThemeChange = (e: Event) => {
-        const customEvent = e as CustomEvent<{ theme: string; effective: 'light' | 'dark' }>
-        host.isDark = customEvent.detail.effective === 'dark'
-        host.theme = customEvent.detail.theme as Theme
-      }
-      document.addEventListener('theme-change', handleThemeChange)
-
       const handleGlobalClick = (): void => {
         if (host.contextMenu.visible) {
           host.actions?.closeContextMenu()
@@ -682,7 +671,6 @@ defineComponent(
         if (lyricScrollTimeout !== null) clearTimeout(lyricScrollTimeout)
         document.removeEventListener('add-song', handleAdd)
         document.removeEventListener('edit-song-save', handleEdit)
-        document.removeEventListener('theme-change', handleThemeChange)
         window.removeEventListener('hashchange', handleRouteChange)
         window.removeEventListener('popstate', handleRouteChange)
         window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -1229,17 +1217,7 @@ defineComponent(
           <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 p-1.5 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors">
             <div class="i-carbon-add"></div><span>添加歌曲</span>
           </button>
-          <button
-            @click=${() => {
-              const modes: Theme[] = ['light', 'dark', 'auto']
-              const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
-              applyTheme(next)
-            }}
-            class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
-            title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
-          >
-            <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
-          </button>
+          <theme-toggle></theme-toggle>
         </div>
       </div>
       <div class="flex-none grid grid-cols-[40px_1fr_80px_70px] md:grid-cols-[50px_1fr_180px_100px_80px] font-bold text-[var(--lx-text-muted)] px-4 py-2 text-xs border-b border-[var(--lx-border)]">

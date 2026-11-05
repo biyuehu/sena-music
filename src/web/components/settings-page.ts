@@ -1,4 +1,4 @@
-import './side-nav'
+import './theme-toggle'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
@@ -154,17 +154,7 @@ defineComponent(
           <main class="flex-1 flex flex-col min-w-0 min-h-0">
             <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
               <span class="font-bold text-sm">设置</span>
-              <button
-                @click=${() => {
-                  const modes: Theme[] = ['light', 'dark', 'auto']
-                  const next = modes[(modes.indexOf(host.theme) + 1) % modes.length]
-                  applyTheme(next)
-                }}
-                class="flex items-center justify-center p-2 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
-                title="切换主题：${host.theme === 'light' ? '亮色' : host.theme === 'dark' ? '暗色' : '跟随系统'}"
-              >
-                <div class="${host.theme === 'light' ? 'i-carbon-sun' : host.theme === 'dark' ? 'i-carbon-moon' : 'i-carbon-contrast'} text-base"></div>
-              </button>
+              <theme-toggle></theme-toggle>
             </div>
 
             <div class="flex-1 overflow-y-auto no-scrollbar min-h-0 p-6">
