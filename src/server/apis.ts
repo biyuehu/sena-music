@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import z from 'zod'
 import {
@@ -131,6 +131,18 @@ const assets = Api.new(
       'public'
     ],
     async (reqRaw, resRaw) => {
+      const url = reqRaw.url?.split('?')[0]
+      if (url === '/logo.svg' || url === '/favicon.ico' || url === '/favicon.svg') {
+        const logoPath = join(process.cwd(), 'logo.svg')
+        if (existsSync(logoPath)) {
+          resRaw.writeHead(200, {
+            'Content-Type': 'image/svg+xml',
+            'Cache-Control': 'public, max-age=86400'
+          })
+          createReadStream(logoPath).pipe(resRaw)
+          return
+        }
+      }
       resRaw.statusCode = 404
       resRaw.setHeader('Content-Type', 'text/html')
       resRaw.end(/* html */ `

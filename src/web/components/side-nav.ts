@@ -1,5 +1,6 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
+import logoUrl from '../../../logo.svg'
 import packageJson from '../../../package.json'
 import { type AppRoute, getAppRoute, navigateTo } from '../router'
 import { getEffectiveTheme, initTheme } from '../theme'
@@ -93,9 +94,7 @@ export const sideNav = defineComponent(
 
         <div class="p-4 flex items-center justify-between mb-4 border-b border-[var(--lx-border)]">
           <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-[var(--lx-accent)] rounded flex items-center justify-center text-white shrink-0">
-              <div class="i-carbon-music"></div>
-            </div>
+            <img src="${logoUrl}" alt="Sena Music" class="w-8 h-8 rounded-lg shadow-sm shrink-0 object-contain" />
             <span class="font-bold text-sm tracking-tight truncate">Sena Music</span>
           </div>
         </div>
@@ -115,6 +114,14 @@ export const sideNav = defineComponent(
                }}>
             <div class="i-carbon-settings shrink-0"></div>
             <span>设置</span>
+          </div>
+          <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'about' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
+               @click=${() => {
+                 navigateTo('about')
+                 host.isDrawerOpen = false
+               }}>
+            <div class="i-carbon-information shrink-0"></div>
+            <span>关于</span>
           </div>
         </div>
 
