@@ -28,6 +28,11 @@ describe('Router', () => {
     expect(getAppRoute()).toBe('settings')
   })
 
+  it('should return about route when hash contains about', () => {
+    window.location.hash = '#/about'
+    expect(getAppRoute()).toBe('about')
+  })
+
   it('should return playlist route for other hashes', () => {
     window.location.hash = '#/playlist'
     expect(getAppRoute()).toBe('playlist')
