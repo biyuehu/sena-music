@@ -1,7 +1,6 @@
 import './theme-toggle'
 import { html, type TemplateResult } from 'lit-html'
 import { defineComponent } from '@/romi/web'
-import logoUrl from '../../../logo.svg'
 import packageJson from '../../../package.json'
 import { initTheme } from '../theme'
 
@@ -110,7 +109,7 @@ export const AboutPage = defineComponent(
               <!-- 项目简介卡片 -->
               <div class="p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
                 <div class="flex items-center gap-4">
-                  <img src="${logoUrl}" alt="Sena Music" class="w-14 h-14 rounded-2xl shadow-md shrink-0 object-contain" />
+                  <img src="/logo.svg" alt="Sena Music" class="w-14 h-14 shrink-0 object-contain" />
                   <div>
                     <div class="flex items-center gap-3">
                       <h1 class="text-2xl font-black tracking-tight text-[var(--lx-text)]">Sena Music</h1>

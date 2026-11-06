@@ -1,6 +1,5 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import logoUrl from '../../../logo.svg'
 import packageJson from '../../../package.json'
 import { type AppRoute, getAppRoute, navigateTo } from '../router'
 import { getEffectiveTheme, initTheme } from '../theme'
@@ -94,7 +93,7 @@ export const sideNav = defineComponent(
 
         <div class="p-4 flex items-center justify-between mb-4 border-b border-[var(--lx-border)]">
           <div class="flex items-center gap-2">
-            <img src="${logoUrl}" alt="Sena Music" class="w-8 h-8 rounded-lg shadow-sm shrink-0 object-contain" />
+            <img src="/logo.svg" alt="Sena Music" class="w-8 h-8 shrink-0 object-contain" />
             <span class="font-bold text-sm tracking-tight truncate">Sena Music</span>
           </div>
         </div>

@@ -1,29 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-  <defs>
-    <!-- Background subtle dark slate radial -->
-    <radialGradient id="bg-plate" cx="50%" cy="50%" r="70%">
-      <stop offset="0%" stop-color="#16171f" />
-      <stop offset="100%" stop-color="#0a0a0d" />
-    </radialGradient>
-  </defs>
-
-  <!-- 1. 哑光极简底板 (Deep Obsidian Base) -->
-  <rect width="512" height="512" rx="112" fill="url(#bg-plate)" />
-  <rect width="510" height="510" x="1" y="1" rx="111" fill="none" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1.5" />
-
-  <!-- 2. 精密几何辅助刻线 (Precision Geometric Grid & Calibration) -->
-  <g stroke="rgba(255, 255, 255, 0.05)" stroke-width="1" fill="none">
-    <!-- 外同心轨 (Outer Harmonic Rings) -->
-    <circle cx="256" cy="256" r="196" stroke-dasharray="2 6" />
-    <circle cx="256" cy="256" r="96" stroke-dasharray="1 5" />
-    <!-- 45° 对角线基准 -->
-    <line x1="120" y1="120" x2="392" y2="392" />
-    <line x1="120" y1="392" x2="392" y2="120" />
-  </g>
-
-  <!-- 3. 八色折面音律星芒 (8-Faceted Prismatic Stella) -->
-  <!-- 纯平面几何色块，高精度 3.5px 纯净负空间接缝切割，绝无杂乱渐变与阴影 -->
-  <g stroke="#0a0a0d" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 8-Faceted Prismatic Stella (Transparent Background) -->
+  <g>
     <!-- 姬野星奏 (sena) -->
     <polygon points="256,256 324,188 452,256" fill="#E3AD88" />
     <!-- 遠藤沙弥 (saya) -->
@@ -42,8 +19,6 @@
     <polygon points="256,256 256,60 324,188" fill="#F7DCFF" />
   </g>
 
-  <!-- 4. 核心几何焦点 (Center Starlight Aperture) -->
-  <!-- 纯白四角星芒负形核心，形成光律锚点 -->
-  <polygon points="256,240 272,256 256,272 240,256" fill="#0a0a0d" />
-  <polygon points="256,243 269,256 256,269 243,256" fill="#FFFFFF" opacity="0.95" />
+  <!-- Central Starlight Diamond -->
+  <polygon points="256,242 270,256 256,270 242,256" fill="#FFFFFF" />
 </svg>

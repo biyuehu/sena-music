@@ -137,7 +137,7 @@ const assets = Api.new(
         if (existsSync(logoPath)) {
           resRaw.writeHead(200, {
             'Content-Type': 'image/svg+xml',
-            'Cache-Control': 'public, max-age=86400'
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
           })
           createReadStream(logoPath).pipe(resRaw)
           return
