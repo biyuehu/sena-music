@@ -1,3 +1,4 @@
+import './about-page'
 import './add-song-modal'
 import './edit-song-modal'
 import './settings-page'
@@ -47,7 +48,7 @@ interface PlayerActions {
   openAddSongModal: () => void
   updateSongOrder: (id: string, newIndex: number) => void
   removeSong: (id: string) => void
-  seekToTime: (time: number) => void
+  seekToTime: (time: number, autoPlay?: boolean) => void
   seekToRatio: (ratio: number, previewOnly?: boolean) => void
   scrollToActiveLyric: (smooth?: boolean) => void
   handleLyricScroll: () => void
@@ -149,6 +150,7 @@ defineComponent(
       loadPlaylist()
       const audio: HTMLAudioElement = new Audio()
       audio.volume = host.volume
+      let lastVolume = host.volume > 0 ? host.volume : 0.5
       let lyricScrollTimeout: NodeJS.Timeout | null = null
 
       const ensureVisualizer = (): void => {
@@ -373,6 +375,7 @@ defineComponent(
           }
         },
         setVolume: (val: number): void => {
+          if (val > 0) lastVolume = val
           audio.volume = host.volume = val
           Cache.set('play-volume', val)
         },
@@ -448,15 +451,19 @@ defineComponent(
             })
           )
         },
-        seekToTime: (time: number): void => {
+        seekToTime: (time: number, autoPlay = true): void => {
           audio.currentTime = time
           Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
           host.isUserScrollingLyrics = false
+          if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+            host.progress = (time / audio.duration) * 100
+            host.currentTime = formatTime(time)
+          }
           if (host.lyrics.length > 0) {
             host.activeLyricIndex = findActiveLyricIndex(host.lyrics, time)
             setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
           }
-          if (!host.isPlaying) {
+          if (autoPlay && !host.isPlaying) {
             audio
               .play()
               .then(() => {
@@ -623,8 +630,144 @@ defineComponent(
         }
       }
       const handleGlobalKeyDown = (e: KeyboardEvent): void => {
-        if (e.key === 'Escape' && host.contextMenu.visible) {
-          host.actions?.closeContextMenu()
+        const path = e.composedPath()
+        const target = path[0] as HTMLElement | undefined
+        const isInput =
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable)
+
+        if (e.key === 'Escape') {
+          if (isInput) {
+            target?.blur()
+            return
+          }
+          if (host.contextMenu.visible) {
+            host.actions?.closeContextMenu()
+            return
+          }
+          if (host.addModalOpen) {
+            host.addModalOpen = false
+            return
+          }
+          if (host.editModalOpen) {
+            host.editModalOpen = false
+            return
+          }
+          if (host.isFullscreen) {
+            host.actions?.toggleFullscreen()
+            return
+          }
+          return
+        }
+
+        if (isInput) return
+
+        // 空格键 / 媒体播放暂停键：播放 / 暂停
+        if (e.code === 'Space' || e.code === 'MediaPlayPause' || e.key === 'MediaPlayPause') {
+          e.preventDefault()
+          host.actions?.toggle()
+          return
+        }
+
+        // 上一首：[ 或 Ctrl/Alt/Meta + 方向左 或 媒体上一首
+        if (
+          e.code === 'BracketLeft' ||
+          e.code === 'MediaTrackPrevious' ||
+          e.key === 'MediaTrackPrevious' ||
+          ((e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowLeft')
+        ) {
+          e.preventDefault()
+          host.actions?.prev()
+          return
+        }
+
+        // 下一首：] 或 Ctrl/Alt/Meta + 方向右 或 媒体下一首
+        if (
+          e.code === 'BracketRight' ||
+          e.code === 'MediaTrackNext' ||
+          e.key === 'MediaTrackNext' ||
+          ((e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowRight')
+        ) {
+          e.preventDefault()
+          host.actions?.next()
+          return
+        }
+
+        // 方向左：快退 5 秒
+        if (e.code === 'ArrowLeft' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+          e.preventDefault()
+          if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+            const targetTime = Math.max(0, (audio.currentTime || 0) - 5)
+            host.actions?.seekToTime(targetTime, host.isPlaying)
+          }
+          return
+        }
+
+        // 方向右：快进 5 秒
+        if (e.code === 'ArrowRight' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+          e.preventDefault()
+          if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+            const targetTime = Math.min(audio.duration, (audio.currentTime || 0) + 5)
+            host.actions?.seekToTime(targetTime, host.isPlaying)
+          }
+          return
+        }
+
+        // 方向上：音量增加 5%
+        if (e.code === 'ArrowUp' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          const nextVol = Math.min(1, Math.round((host.volume + 0.05) * 100) / 100)
+          host.actions?.setVolume(nextVol)
+          return
+        }
+
+        // 方向下：音量减少 5%
+        if (e.code === 'ArrowDown' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          const nextVol = Math.max(0, Math.round((host.volume - 0.05) * 100) / 100)
+          host.actions?.setVolume(nextVol)
+          return
+        }
+
+        // M 键：静音 / 取消静音
+        if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          if (host.volume > 0) {
+            lastVolume = host.volume
+            host.actions?.setVolume(0)
+          } else {
+            host.actions?.setVolume(lastVolume > 0 ? lastVolume : 0.5)
+          }
+          return
+        }
+
+        // F 键：全屏 / 退出全屏歌词界面
+        if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          host.actions?.toggleFullscreen()
+          return
+        }
+
+        // O 键：切换播放模式（列表循环/随机/单曲/停止）
+        if ((e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          host.actions?.switchMode()
+          return
+        }
+
+        // / 键：快速聚焦搜索框
+        if (e.key === '/' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault()
+          const root = host.shadowRoot
+          const searchInput = root?.querySelector('input[type="text"]') as HTMLInputElement | null
+          if (searchInput) {
+            searchInput.focus()
+            searchInput.select()
+          }
+          return
         }
       }
       const handleGlobalResize = (): void => {
@@ -782,17 +925,17 @@ defineComponent(
         </div>
 
         <div class="flex items-center gap-6">
-          <button @click=${() => host.actions?.prev()} class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
-          <button @click=${() => host.actions?.toggle()} class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+          <button @click=${() => host.actions?.prev()} title="上一首 (Ctrl+← / [)" class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
+          <button @click=${() => host.actions?.toggle()} title="${host.isPlaying ? '暂停 (Space)' : '播放 (Space)'}" class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
             <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
           </button>
-          <button @click=${() => host.actions?.next()} class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
+          <button @click=${() => host.actions?.next()} title="下一首 (Ctrl+→ / ])" class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
         </div>
 
         <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
           <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
           
-          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]}" @click=${() => host.actions?.switchMode()}></div>
+          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]} (O)" @click=${() => host.actions?.switchMode()}></div>
 
           <div class="relative flex items-center">
             <div class="absolute bottom-full right-0 mb-10 px-4 py-3 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-2xl shadow-2xl transition-all duration-200 origin-bottom-right hover:bg-[var(--lx-bg-alt)]
@@ -841,6 +984,7 @@ defineComponent(
             </div>
 
             <div class="i-carbon-volume-up text-xl cursor-pointer ${host.showVolumeBar ? 'text-[var(--lx-accent)]' : 'opacity-40 hover:opacity-100'}"
+                 title="音量调节 (↑ / ↓ / M静音)"
                  @click=${(e: Event) => {
                    e.stopPropagation()
                    host.showVolumeBar = !host.showVolumeBar
@@ -848,7 +992,7 @@ defineComponent(
             </div>
           </div>
 
-          ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
+          ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" title="全屏歌词 (F)" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
         </div>
       </div>
     </div>
@@ -1194,6 +1338,7 @@ defineComponent(
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
       <settings-page class="${host.currentRoute === 'settings' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></settings-page>
+      <about-page class="${host.currentRoute === 'about' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></about-page>
       <div class="${host.currentRoute === 'playlist' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}">
         <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
         <div class="relative flex-1 max-w-sm min-w-[200px] hidden xl:block mr-auto">

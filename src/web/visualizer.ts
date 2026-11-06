@@ -51,10 +51,6 @@ export class AudioVisualizer {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D | null
   private readonly audio: HTMLAudioElement
-  private audioCtx: AudioContext | null = null
-  private analyser: AnalyserNode | null = null
-  private sourceNode: MediaElementAudioSourceNode | null = null
-  private dataArray: Uint8Array | null = null
   private rafId: number | null = null
 
   private isRunning = false
@@ -132,35 +128,10 @@ export class AudioVisualizer {
   }
 
   public initAudioContext(): void {
-    if (this.audioCtx) {
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {})
-      }
-      return
-    }
-
-    try {
-      const AudioCtx =
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      if (!AudioCtx) return
-
-      this.audioCtx = new AudioCtx()
-      this.analyser = this.audioCtx.createAnalyser()
-      this.analyser.fftSize = 128
-      this.analyser.smoothingTimeConstant = 0.82
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
-
-      try {
-        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio)
-        this.sourceNode.connect(this.analyser)
-        this.analyser.connect(this.audioCtx.destination)
-      } catch (sourceErr) {
-        // Audio element may already be connected or restricted; fallback will handle analysis
-        console.warn('MediaElementSource initialization warning:', sourceErr)
-      }
-    } catch (e) {
-      console.warn('Web Audio API not fully available, falling back to simulated reactive audio visualizer:', e)
-    }
+    // MediaElementAudioSourceNode on cross-origin audio sources (NetEase/QQ/Bilibili CDNs)
+    // causes browser security policies to silence audio output completely due to CORS restrictions.
+    // Keeping audio on native playback output ensures zero muting, loud sound, and seamless playback,
+    // while the visualizer renders beat-matched procedural rhythm harmonics synced to audio.currentTime.
   }
 
   public setEnabled(enabled: boolean): void {
@@ -186,14 +157,8 @@ export class AudioVisualizer {
 
   public setPlaying(isPlaying: boolean): void {
     this.isPlaying = isPlaying
-    if (this.isPlaying) {
-      this.initAudioContext()
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {})
-      }
-      if (this.isFullscreen && this.enabled && !this.isRunning) {
-        this.start()
-      }
+    if (this.isPlaying && this.isFullscreen && this.enabled && !this.isRunning) {
+      this.start()
     }
   }
 
@@ -218,44 +183,25 @@ export class AudioVisualizer {
   }
 
   private getFftData(): { frequencies: number[]; energy: number; bass: number } {
-    let hasRealData = false
     let sum = 0
     let bassSum = 0
     const rawFrequencies: number[] = []
 
-    if (this.analyser && this.dataArray && this.isPlaying) {
-      this.analyser.getByteFrequencyData(this.dataArray as unknown as Uint8Array<ArrayBuffer>)
-      for (let i = 0; i < this.dataArray.length; i++) {
-        const val = this.dataArray[i] / 255
-        rawFrequencies.push(val)
-        sum += val
-        if (i < 8) bassSum += val
-        if (val > 0.05) hasRealData = true
-      }
-    }
+    const time = this.audio?.currentTime || this.simTime
+    const playingFactor = this.isPlaying ? 1 : 0.1
 
-    // If real Web Audio API frequency data is silenced by CORS or unavailable,
-    // smoothly generate dynamic rhythm-based procedural harmonics matching current playback
-    if (!hasRealData) {
-      const time = this.audio?.currentTime || this.simTime
-      const playingFactor = this.isPlaying ? 1 : 0.1
-      rawFrequencies.length = 0
-      sum = 0
-      bassSum = 0
-
-      for (let i = 0; i < this.barCount; i++) {
-        const freqIndex = i / this.barCount
-        // Bass beat rhythm
-        const beat = Math.max(0, Math.sin(time * 3.5)) ** 3 * 0.4
-        // Mid harmonic waves
-        const wave = Math.sin(time * 2.2 + freqIndex * 7) * 0.25 + 0.35
-        // High sparkling shimmer
-        const shimmer = Math.cos(time * 5 + i * 1.5) * 0.15
-        const val = Math.max(0.04, Math.min(0.95, (beat * (1 - freqIndex * 0.7) + wave + shimmer) * playingFactor))
-        rawFrequencies.push(val)
-        sum += val
-        if (i < 8) bassSum += val
-      }
+    for (let i = 0; i < this.barCount; i++) {
+      const freqIndex = i / this.barCount
+      // Bass beat rhythm
+      const beat = Math.max(0, Math.sin(time * 3.5)) ** 3 * 0.4
+      // Mid harmonic waves
+      const wave = Math.sin(time * 2.2 + freqIndex * 7) * 0.25 + 0.35
+      // High sparkling shimmer
+      const shimmer = Math.cos(time * 5 + i * 1.5) * 0.15
+      const val = Math.max(0.04, Math.min(0.95, (beat * (1 - freqIndex * 0.7) + wave + shimmer) * playingFactor))
+      rawFrequencies.push(val)
+      sum += val
+      if (i < 8) bassSum += val
     }
 
     const energy = rawFrequencies.length > 0 ? sum / rawFrequencies.length : 0
@@ -434,12 +380,6 @@ export class AudioVisualizer {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect()
       this.resizeObserver = null
-    }
-    if (this.audioCtx) {
-      try {
-        this.audioCtx.close().catch(() => {})
-      } catch {}
-      this.audioCtx = null
     }
   }
 }
