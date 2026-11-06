@@ -1,7 +1,7 @@
 import './theme-toggle'
 import './toast'
 import { html, type TemplateResult } from 'lit-html'
-import { defineComponent, State } from '@/romi/web'
+import { batch, defineComponent, State } from '@/romi/web'
 import type { Settings } from '../../common/types'
 import { Cache } from '../cache'
 import { httpClient } from '../client'
@@ -97,8 +97,10 @@ defineComponent(
         httpClient.getCacheInfo().then((result) =>
           result.match({
             Right: (info) => {
-              host.cacheSize = info.sizeBytes
-              host.cachePath = info.path
+              batch(() => {
+                host.cacheSize = info.sizeBytes
+                host.cachePath = info.path
+              })
             },
             Left: ({ error }) => {
               if (getAppRoute() === 'settings') {
@@ -246,8 +248,10 @@ defineComponent(
                               .then((result) => {
                                 result.match({
                                   Right: (info) => {
-                                    host.cacheSize = info.sizeBytes
-                                    host.cachePath = info.path
+                                    batch(() => {
+                                      host.cacheSize = info.sizeBytes
+                                      host.cachePath = info.path
+                                    })
                                     showToast('清理成功', 'success')
                                   },
                                   Left: ({ error }) => showToast(`清理失败：${error}`, 'error')

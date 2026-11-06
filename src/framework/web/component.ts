@@ -3,7 +3,7 @@
 
 import type { TemplateResult } from 'lit-html'
 import { html, render } from 'lit-html'
-import { batch, effect, signal } from 'usignal'
+import { batch, Effect, effect, signal } from 'usignal'
 import { Variant } from '@/romi/utils/adt'
 import { buildSheets, globalStyleWatcher } from './sheets'
 
@@ -159,8 +159,12 @@ export function defineComponentFrom<T extends AnyFields>(
     }
 
     public connectedCallback(): void {
-      this.stopEffect = this.setupEffect()
       this.userCleanup = definition.connectedCallback?.(this as unknown as Host<T>)
+      queueMicrotask(() => {
+        if (!this.isConnected) return
+        this.stopEffect?.()
+        this.stopEffect = this.setupEffect()
+      })
     }
 
     public disconnectedCallback(): void {
@@ -195,24 +199,32 @@ export function defineComponentFrom<T extends AnyFields>(
        * 批量更新场景（同一 tick 设多个 signal）请在调用处包裹 batch()：
        *   batch(() => { host.a = 1; host.b = 2 })
        */
-      return effect(() => {
-        definition.willUpdate?.(host)
+      const fx = new Effect(
+        () => {
+          definition.willUpdate?.(host)
 
-        if (definition.render)
-          render(
-            /* definition.css ? html`<style>${definition.css}</style>${definition.render(host)}` :  */ definition.render(
-              host
-            ),
-            this.root
-          )
+          if (definition.render)
+            render(
+              /* definition.css ? html`<style>${definition.css}</style>${definition.render(host)}` :  */ definition.render(
+                host
+              ),
+              this.root
+            )
 
-        if (!this.firstRendered) {
-          this.firstRendered = true
-          definition.firstUpdated?.(host)
-        }
+          if (!this.firstRendered) {
+            this.firstRendered = true
+            definition.firstUpdated?.(host)
+          }
 
-        definition.updated?.(host)
-      })
+          definition.updated?.(host)
+        },
+        void 0,
+        { async: false }
+      ).run()
+
+      return () => {
+        fx.stop()
+      }
     }
   }
 

@@ -89,7 +89,8 @@ export function createClient<R extends ClientRoute>(
         return buildProxy([...segments, key])
       },
       async apply(_, __, params) {
-        let url = `${options.baseUrl}/${segments.join('/')}`
+        const base = options.baseUrl ? options.baseUrl.replace(/\/+$/, '') : ''
+        let url = base ? `${base}/${segments.join('/')}` : `/${segments.join('/')}`
 
         const init: RequestInit = {
           method: 'POST',
