@@ -14,6 +14,7 @@ import {
   getStoredColorScheme,
   getStoredTheme,
   initTheme,
+  THEME_COLORS,
   type Theme
 } from '../theme'
 import { showToast } from './toast'
@@ -29,7 +30,7 @@ defineComponent(
     initial: State<Settings>({ playlistId: 0, cacheMaxSize: 0 }),
     isDark: State(getEffectiveTheme() === 'dark'),
     autoNextOnError: State(true),
-    colorScheme: State<ColorScheme>('orange'),
+    colorScheme: State<ColorScheme>(getStoredColorScheme()),
     theme: State<Theme>('auto'),
     cacheSize: State(0),
     cachePath: State(''),
@@ -164,13 +165,14 @@ defineComponent(
         { value: 'auto', label: '跟随系统' }
       ]
 
-      const colorOptions: Array<{ value: ColorScheme; label: string }> = [
-        { value: 'orange', label: '橙色' },
-        { value: 'blue', label: '蓝色' },
-        { value: 'purple', label: '紫色' },
-        { value: 'green', label: '绿色' },
-        { value: 'pink', label: '粉色' }
-      ]
+      const activeColor = THEME_COLORS.find((c) => c.id === host.colorScheme)
+      const currentColor = (host.isDark ? activeColor?.dark : activeColor?.light) || 'var(--lx-accent)'
+
+      const colorOptions = THEME_COLORS.map((c) => ({
+        value: c.id,
+        label: c.name,
+        color: host.isDark ? c.dark : c.light
+      }))
 
       return html`
         <div class="flex flex-col flex-1 h-full min-h-0 bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
@@ -323,6 +325,7 @@ defineComponent(
                       <label class="flex flex-col gap-1.5">
                         <span class="text-xs font-bold opacity-70">配色方案</span>
                         <select
+                          style="color: ${currentColor}; font-weight: 600;"
                           @change=${(e: Event) => {
                             const value = (e.target as HTMLSelectElement).value as ColorScheme
                             host.colorScheme = value
@@ -331,7 +334,13 @@ defineComponent(
                         >
                           ${colorOptions.map(
                             (opt) =>
-                              html`<option value=${opt.value} ?selected=${host.colorScheme === opt.value}>${opt.label}</option>`
+                              html`<option
+                                value=${opt.value}
+                                style="color: ${opt.color}; font-weight: 600; background-color: var(--lx-bg-alt);"
+                                ?selected=${host.colorScheme === opt.value}
+                              >
+                                ● ${opt.label}
+                              </option>`
                           )}
                         </select>
                       </label>

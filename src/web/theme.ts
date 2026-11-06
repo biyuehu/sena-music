@@ -2,26 +2,55 @@ import { Cache } from './cache'
 
 export type Theme = 'light' | 'dark' | 'auto'
 
-export type ColorScheme = 'orange' | 'blue' | 'purple' | 'green' | 'pink'
+export type ColorScheme = 'romi' | 'sena' | 'hitsuji' | 'ai' | 'hotaru' | 'saya' | 'ayumu' | 'tsubasa'
 
-const COLOR_SCHEMES: Record<ColorScheme, { light: string; dark: string }> = {
-  orange: { light: '#f97316', dark: '#fb923c' },
-  blue: { light: '#3b82f6', dark: '#60a5fa' },
-  purple: { light: '#8b5cf6', dark: '#a78bfa' },
-  green: { light: '#10b981', dark: '#34d399' },
-  pink: { light: '#ec4899', dark: '#f472b6' }
+export interface ThemeColorItem {
+  id: ColorScheme
+  name: string
+  brand: string
+  light: string
+  dark: string
+}
+
+export const THEME_COLORS: readonly ThemeColorItem[] = [
+  { id: 'romi', name: '有村ロミ - Arimura Romi', brand: '#d87cb6', light: '#d87cb6', dark: '#ea9fd0' },
+  { id: 'sena', name: '姬野星奏 - Himeno Sena', brand: '#E3AD88', light: '#E3AD88', dark: '#f0c8ad' },
+  { id: 'hitsuji', name: '美浜羊 - Mihama Hitsuji', brand: '#F7DCFF', light: '#F7DCFF', dark: '#ebd0ff' },
+  { id: 'ai', name: '夏目藍 - Natsume Ai', brand: '#5b8dee', light: '#5b8dee', dark: '#8eb3f6' },
+  { id: 'hotaru', name: '水無月蛍 - Minazuki Hotaru', brand: '#4caf7d', light: '#4caf7d', dark: '#72c99a' },
+  { id: 'saya', name: '遠藤沙弥 - Endou Saya', brand: '#FF9891', light: '#FF9891', dark: '#ffb7b3' },
+  { id: 'ayumu', name: '七濑步 - Nanase Ayumu', brand: '#B28F96', light: '#B28F96', dark: '#d1b2b8' },
+  { id: 'tsubasa', name: '羽音々翼 - Haotone Tsubasa', brand: '#BCE3EA', light: '#BCE3EA', dark: '#d2eff4' }
+] as const
+
+export const COLOR_SCHEMES: Record<ColorScheme, { light: string; dark: string }> = Object.fromEntries(
+  THEME_COLORS.map((c) => [c.id, { light: c.light, dark: c.dark }])
+) as Record<ColorScheme, { light: string; dark: string }>
+
+const LEGACY_SCHEME_MAP: Record<string, ColorScheme> = {
+  orange: 'sena',
+  blue: 'ai',
+  purple: 'hitsuji',
+  green: 'hotaru',
+  pink: 'romi'
 }
 
 export function getStoredColorScheme(): ColorScheme {
   const cached = Cache.get<string>('color-scheme')
-  if (cached.isJust() && COLOR_SCHEMES[cached.value as ColorScheme]) {
-    return cached.value as ColorScheme
+  if (cached.isJust()) {
+    const val = cached.value
+    if (COLOR_SCHEMES[val as ColorScheme]) {
+      return val as ColorScheme
+    }
+    if (LEGACY_SCHEME_MAP[val]) {
+      return LEGACY_SCHEME_MAP[val]
+    }
   }
-  return 'orange'
+  return 'sena'
 }
 
 export function applyColorScheme(scheme: ColorScheme): void {
-  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.orange
+  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.sena
   const effective = getEffectiveTheme()
   const accent = effective === 'dark' ? colors.dark : colors.light
   document.documentElement.style.setProperty('--lx-accent', accent)
@@ -76,7 +105,7 @@ export function initTheme(): void {
   applyTheme(stored)
 
   const scheme = getStoredColorScheme()
-  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.orange
+  const colors = COLOR_SCHEMES[scheme] ?? COLOR_SCHEMES.sena
   const effective = getEffectiveTheme()
   document.documentElement.style.setProperty('--lx-accent', effective === 'dark' ? colors.dark : colors.light)
 
