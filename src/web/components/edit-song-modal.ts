@@ -1,6 +1,6 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import type { SongInfo, SongLyricSourceType, SongSourceType } from '../../common/types'
+import type { BiliSearchResultItem, SongInfo, SongLyricSourceType, SongSourceType } from '../../common/types'
 import { httpClient } from '../client'
 import { showToast } from './toast'
 
@@ -17,7 +17,11 @@ export const editSongModal = defineComponent(
     lyricOffset: State(0),
     customOriginal: State(''),
     customTranslation: State(''),
-    customRomaji: State('')
+    customRomaji: State(''),
+    biliSearchModalOpen: State(false),
+    biliSearchKeyword: State(''),
+    biliSearchResults: State<BiliSearchResultItem[]>([]),
+    biliSearching: State(false)
   },
   {
     useGlobalStyles: true,
@@ -59,7 +63,45 @@ export const editSongModal = defineComponent(
         if (host.isLoading) return
         host.isOpen = false
         host.draft = null
+        host.biliSearchModalOpen = false
+        host.biliSearchResults = []
+        host.biliSearching = false
         host.dispatchEvent(new CustomEvent('close'))
+      }
+
+      const executeBiliSearch = (keyword: string): void => {
+        const clean = keyword.trim()
+        if (!clean) return
+        host.biliSearching = true
+        httpClient
+          .searchBiliSong({ keyword: clean })
+          .then((res) =>
+            res.match({
+              Right: ({ results }) => {
+                host.biliSearchResults = results
+                if (results.length === 0) {
+                  showToast('未找到相关视频', 'info')
+                }
+              },
+              Left: ({ error }) => {
+                showToast(`搜索失败：${error}`, 'error')
+              }
+            })
+          )
+          .catch((err) => {
+            console.error('Failed to search Bilibili:', err)
+            showToast('搜索异常', 'error')
+          })
+          .finally(() => {
+            host.biliSearching = false
+          })
+      }
+
+      const formatPlayCount = (play: number): string => {
+        if (play >= 10_000) {
+          return `${(play / 10_000).toFixed(1)}万`
+        }
+        return play.toString()
       }
 
       const handleSubmit = async (): Promise<void> => {
@@ -160,10 +202,32 @@ export const editSongModal = defineComponent(
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1.5 text-[var(--lx-text)]">歌曲值</label>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-sm font-medium text-[var(--lx-text)]">歌曲值</label>
+                  ${
+                    draft.type === 'bili'
+                      ? html`
+                        <button
+                          type="button"
+                          class="text-xs px-2.5 py-1 rounded bg-[var(--lx-accent)] text-white hover:opacity-90 flex items-center gap-1 cursor-pointer transition-opacity"
+                          @click=${() => {
+                            host.biliSearchKeyword = `${draft.name} ${draft.artists[0] || ''}`.trim()
+                            host.biliSearchResults = []
+                            host.biliSearchModalOpen = true
+                            executeBiliSearch(host.biliSearchKeyword)
+                          }}
+                        >
+                          <span class="i-carbon-search text-xs"></span>
+                          <span>搜索 B站音源</span>
+                        </button>
+                      `
+                      : ''
+                  }
+                </div>
                 <input
                   type="text"
                   class="w-full p-2.5 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-sm focus:border-[var(--lx-accent)] focus:outline-none"
+                  placeholder="${draft.type === 'bili' ? '输入 BV 号、AV 号或完整视频链接' : ''}"
                   .value=${draft.value}
                   @input=${(e: Event) => {
                     const target = e.target as HTMLInputElement
@@ -307,6 +371,145 @@ export const editSongModal = defineComponent(
             </div>
           </div>
         </div>
+
+        ${
+          host.biliSearchModalOpen
+            ? html`
+          <div
+            class="fixed inset-0 bg-black/70 flex items-center justify-center z-[210] p-4"
+            @click=${() => (host.biliSearchModalOpen = false)}
+          >
+            <div
+              class="bg-[var(--lx-main)] rounded-xl p-5 w-full max-w-lg max-h-[85vh] flex flex-col border border-[var(--lx-border)] shadow-2xl"
+              @click=${(e: Event) => e.stopPropagation()}
+            >
+              <div class="flex justify-between items-center mb-4 flex-none">
+                <div class="text-base font-semibold text-[var(--lx-text)] flex items-center gap-2">
+                  <span class="i-carbon-search"></span>
+                  <span>搜索 B站音源</span>
+                </div>
+                <button
+                  class="p-1 rounded hover:bg-[var(--lx-hover)] text-[var(--lx-text-muted)] hover:text-[var(--lx-text)] transition-colors"
+                  @click=${() => (host.biliSearchModalOpen = false)}
+                >
+                  <div class="i-carbon-close text-xl"></div>
+                </button>
+              </div>
+
+              <div class="flex gap-2 mb-4 flex-none">
+                <input
+                  type="text"
+                  class="flex-1 p-2 rounded border border-[var(--lx-border)] bg-[var(--lx-bg-alt)] text-[var(--lx-text)] text-xs focus:border-[var(--lx-accent)] focus:outline-none"
+                  placeholder="输入歌名、歌手或关键字..."
+                  .value=${host.biliSearchKeyword}
+                  @input=${(e: Event) => {
+                    host.biliSearchKeyword = (e.target as HTMLInputElement).value
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      executeBiliSearch(host.biliSearchKeyword)
+                    }
+                  }}
+                />
+                <button
+                  class="px-3 py-1.5 rounded bg-[var(--lx-accent)] text-white text-xs font-medium hover:opacity-90 flex items-center gap-1 disabled:opacity-50"
+                  ?disabled=${host.biliSearching || !host.biliSearchKeyword.trim()}
+                  @click=${() => executeBiliSearch(host.biliSearchKeyword)}
+                >
+                  <span class="${host.biliSearching ? 'i-carbon-renew animate-spin' : 'i-carbon-search'} text-xs"></span>
+                  <span>${host.biliSearching ? '搜索中' : '搜索'}</span>
+                </button>
+              </div>
+
+              <div class="flex-1 overflow-y-auto no-scrollbar space-y-2 min-h-0">
+                ${
+                  host.biliSearching
+                    ? html`
+                      <div class="flex flex-col items-center justify-center py-12 opacity-40 gap-2">
+                        <div class="i-carbon-renew animate-spin text-2xl"></div>
+                        <span class="text-xs">正在搜索 B站视频...</span>
+                      </div>
+                    `
+                    : host.biliSearchResults.length === 0
+                      ? html`
+                      <div class="flex flex-col items-center justify-center py-12 opacity-40 text-xs">
+                        暂无搜索结果
+                      </div>
+                    `
+                      : (() => {
+                          const currentBvidMatch = draft.value?.match(/(BV[0-9a-zA-Z]{10})/i)?.[1]?.toLowerCase()
+                          return host.biliSearchResults.map((item) => {
+                            const isCurrent = Boolean(currentBvidMatch && item.bvid.toLowerCase() === currentBvidMatch)
+                            return html`
+                            <div
+                              class="flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer group bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] ${
+                                isCurrent
+                                  ? 'border-[var(--lx-accent)]'
+                                  : 'border-[var(--lx-border)] hover:border-[var(--lx-accent)]'
+                              }"
+                              @click=${() => {
+                                host.draft = { ...draft, value: item.bvid }
+                                host.biliSearchModalOpen = false
+                                showToast(`已选择：${item.title} (${item.bvid})`, 'success')
+                              }}
+                            >
+                              <div class="relative flex-none">
+                                <img
+                                  src="${item.pic}"
+                                  referrerpolicy="no-referrer"
+                                  loading="lazy"
+                                  class="w-24 h-15 rounded object-cover bg-black/20"
+                                  alt=""
+                                />
+                                <span class="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1 py-0.2 rounded font-mono">
+                                  ${item.durationStr}
+                                </span>
+                              </div>
+                              <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5 gap-1.5">
+                                <div class="flex items-center gap-1.5">
+                                  ${
+                                    isCurrent
+                                      ? html`<span class="flex-none text-[10px] px-1.5 py-0.2 rounded bg-[var(--lx-accent)] text-white font-medium">当前选用</span>`
+                                      : ''
+                                  }
+                                  <span class="text-xs font-medium line-clamp-2 leading-relaxed transition-colors ${
+                                    isCurrent
+                                      ? 'text-[var(--lx-accent)] font-semibold'
+                                      : 'text-[var(--lx-text)] group-hover:text-[var(--lx-accent)]'
+                                  }">
+                                    ${item.title}
+                                  </span>
+                                </div>
+                                <div class="flex items-center flex-wrap gap-2 text-[11px] opacity-65">
+                                  <span class="font-mono text-[11px] select-all">${item.bvid}</span>
+                                  <span>·</span>
+                                  <span class="truncate max-w-[120px]">${item.author}</span>
+                                  <span>·</span>
+                                  <span>${formatPlayCount(item.play)}播放</span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                class="flex-none px-2.5 py-1 text-xs rounded transition-all ${
+                                  isCurrent
+                                    ? 'border border-[var(--lx-accent)] text-[var(--lx-accent)] font-medium bg-transparent flex items-center gap-1 cursor-default'
+                                    : 'bg-[var(--lx-accent)] text-white opacity-85 group-hover:opacity-100'
+                                }"
+                              >
+                                ${isCurrent ? html`<span class="i-carbon-checkmark text-xs"></span>已选用` : '选用'}
+                              </button>
+                            </div>
+                          `
+                          })
+                        })()
+                }
+              </div>
+            </div>
+          </div>
+        `
+            : ''
+        }
       `
     }
   }
