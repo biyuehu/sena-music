@@ -12,9 +12,17 @@ import {
   VirtualResourceReturner,
   virtualResourceReturnSchema
 } from '@/romi'
-import { cacheInfoSchema, lyricResultSchema, playListSchema, settingsSchema } from '../common/types'
+import {
+  autoMatchBiliSongResponseSchema,
+  cacheInfoSchema,
+  lyricResultSchema,
+  playListSchema,
+  searchBiliSongResponseSchema,
+  settingsSchema
+} from '../common/types'
 import {
   addSongHandler,
+  autoMatchBiliSongHandler,
   cleanCacheHandler,
   getBiliAudioFileHandler,
   getCacheInfoHandler,
@@ -26,6 +34,7 @@ import {
   getYoutubeAudioFileHandler,
   removeSongHandler,
   saveCustomLyricHandler,
+  searchBiliSongHandler,
   setSettingsHandler,
   setSongOrderHandler,
   setSongSourceHandler,
@@ -120,6 +129,20 @@ const saveCustomLyric = Api.new(
   new JsonReturner()
 )
 
+const searchBiliSong = Api.new(
+  searchBiliSongHandler,
+  searchBiliSongResponseSchema,
+  standardJsonReturnErrorSchema,
+  new JsonReturner()
+)
+
+const autoMatchBiliSong = Api.new(
+  autoMatchBiliSongHandler,
+  autoMatchBiliSongResponseSchema,
+  standardJsonReturnErrorSchema,
+  new JsonReturner()
+)
+
 const assets = Api.new(
   Action.empty(),
   z.object(),
@@ -177,5 +200,7 @@ export const appRoute = {
   cleanCache,
   getLyric,
   saveCustomLyric,
+  searchBiliSong,
+  autoMatchBiliSong,
   [any]: assets
 } satisfies RouteWith<AppState>

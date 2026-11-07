@@ -60,4 +60,71 @@ describe('BiliFetcher', () => {
       }
     })
   })
+
+  describe('duration and candidate scoring', () => {
+    it('should parse duration string correctly', () => {
+      expect(BiliFetcher.parseDurationStr('03:45')).toBe(225)
+      expect(BiliFetcher.parseDurationStr('01:02:03')).toBe(3723)
+      expect(BiliFetcher.parseDurationStr(120)).toBe(120)
+      expect(BiliFetcher.parseDurationStr('')).toBe(0)
+    })
+
+    it('should format duration seconds correctly', () => {
+      expect(BiliFetcher.formatDurationSeconds(225)).toBe('03:45')
+      expect(BiliFetcher.formatDurationSeconds(3723)).toBe('1:02:03')
+      expect(BiliFetcher.formatDurationSeconds(0)).toBe('00:00')
+    })
+
+    it('should score candidate correctly based on title, artist, duration and penalties', () => {
+      const goodCandidate = {
+        bvid: 'BV1234567890',
+        title: 'ヨルシカ - だから僕は音楽を辞めた (Official Video)',
+        author: 'ヨルシカ Official',
+        pic: 'https://i0.hdslb.com/bfs/archive/test.jpg',
+        duration: 245,
+        durationStr: '04:05',
+        play: 500000
+      }
+      const score = BiliFetcher.scoreCandidate(goodCandidate, 'だから僕は音楽を辞めた', ['ヨルシカ'], 245)
+      expect(score).toBeGreaterThanOrEqual(80)
+
+      const coverCandidate = {
+        bvid: 'BV9876543210',
+        title: '【翻唱】だから僕は音楽を辞めた / 歌ってみた',
+        author: '路人歌手',
+        pic: 'https://i0.hdslb.com/bfs/archive/test2.jpg',
+        duration: 240,
+        durationStr: '04:00',
+        play: 500
+      }
+      const coverScore = BiliFetcher.scoreCandidate(coverCandidate, 'だから僕は音乐を辞めた', ['ヨルシカ'], 245)
+      expect(score).toBeGreaterThan(coverScore)
+    })
+  })
+
+  describe('searchVideos and matchBestVideo', () => {
+    it('should search videos with keyword', async () => {
+      const result = await BiliFetcher.searchVideos('ヨルシカ', 1, 5)
+      expect(result.isJust()).toBe(true)
+      if (result.isJust()) {
+        const list = result.value
+        expect(Array.isArray(list)).toBe(true)
+        if (list.length > 0) {
+          expect(list[0].bvid).toBeDefined()
+          expect(list[0].title).toBeDefined()
+          expect(list[0].durationStr).toBeDefined()
+        }
+      }
+    })
+
+    it('should match best video for known song', async () => {
+      const result = await BiliFetcher.matchBestVideo('だから僕は音楽を辞めた', ['ヨルシカ'])
+      expect(result.isJust()).toBe(true)
+      if (result.isJust()) {
+        const { best, score } = result.value
+        expect(best.bvid).toBeDefined()
+        expect(score).toBeGreaterThanOrEqual(50)
+      }
+    })
+  })
 })

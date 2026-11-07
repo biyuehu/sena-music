@@ -5,9 +5,12 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
+import type { BiliSearchResultItem } from '../../common/types'
 import { pruneCache } from '../cache'
 import { CONFIG, logger } from '../common'
 import { Data } from '../data'
+
+export type BiliSearchResult = BiliSearchResultItem
 
 export interface BiliVideoInfo {
   bvid: string
@@ -366,5 +369,229 @@ export namespace BiliFetcher {
     } finally {
       if (existsSync(lockPath)) unlinkSync(lockPath)
     }
+  }
+
+  export function parseDurationStr(duration: string | number | undefined): number {
+    if (typeof duration === 'number') return duration
+    if (!duration) return 0
+    const parts = duration.split(':').map((p) => parseInt(p, 10))
+    if (parts.some((p) => Number.isNaN(p))) return 0
+    if (parts.length === 2) {
+      return (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+    }
+    if (parts.length === 3) {
+      return (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0)
+    }
+    return parseInt(duration, 10) || 0
+  }
+
+  export function formatDurationSeconds(seconds: number): string {
+    const s = Math.max(0, Math.floor(seconds))
+    const m = Math.floor(s / 60)
+    const remainingS = s % 60
+    if (m >= 60) {
+      const h = Math.floor(m / 60)
+      const remainingM = m % 60
+      return `${h}:${remainingM.toString().padStart(2, '0')}:${remainingS.toString().padStart(2, '0')}`
+    }
+    return `${m.toString().padStart(2, '0')}:${remainingS.toString().padStart(2, '0')}`
+  }
+
+  export function scoreCandidate(
+    candidate: BiliSearchResult,
+    songName: string,
+    artists: string[],
+    targetDuration?: number
+  ): number {
+    let score = 0
+    const norm = (s: string) => s.toLowerCase().replace(/[\s\-_—·.,!?'"()（）[\]【】]/g, '')
+    const candTitleNorm = norm(candidate.title)
+    const candAuthorNorm = norm(candidate.author)
+    const songNameNorm = norm(songName)
+
+    if (candTitleNorm.includes(songNameNorm)) {
+      score += 40
+      if (candTitleNorm === songNameNorm) {
+        score += 15
+      }
+    } else {
+      const words = songName.toLowerCase().split(/\s+/).filter(Boolean)
+      if (words.length > 1) {
+        const matchedWords = words.filter((w) => candidate.title.toLowerCase().includes(w))
+        score += Math.round((matchedWords.length / words.length) * 30)
+      }
+    }
+
+    for (const artist of artists) {
+      const artistNorm = norm(artist)
+      if (!artistNorm) continue
+      if (candAuthorNorm.includes(artistNorm)) {
+        score += 30
+        break
+      }
+      if (candTitleNorm.includes(artistNorm)) {
+        score += 20
+        break
+      }
+    }
+
+    if (targetDuration && targetDuration > 0 && candidate.duration > 0) {
+      const diff = Math.abs(candidate.duration - targetDuration)
+      if (diff <= 3) {
+        score += 30
+      } else if (diff <= 8) {
+        score += 20
+      } else if (diff <= 15) {
+        score += 10
+      } else if (diff > 60) {
+        score -= 25
+      }
+    }
+
+    if (/(?:official|mv|完整版|原曲|音频|无损|高音质|单曲)/i.test(candidate.title)) {
+      score += 10
+    }
+
+    const negativePattern =
+      /(?:翻唱|cover|remix|改编|鬼畜|钢琴|吉他|伴奏|instrumental|inst|教程|教学|混剪|mad|amv|现场版|live|reaction|解说|纯伴奏|歌词排版|utau|ai|虚拟歌姬)/i
+    if (negativePattern.test(candidate.title) && !negativePattern.test(songName)) {
+      score -= 30
+    }
+
+    if (candidate.play >= 100_000) {
+      score += 10
+    } else if (candidate.play >= 10_000) {
+      score += 5
+    }
+
+    return score
+  }
+
+  export async function searchVideos(keyword: string, page = 1, pageSize = 20): Promise<Maybe<BiliSearchResult[]>> {
+    const cleanKeyword = keyword.trim()
+    if (!cleanKeyword) return Just([])
+
+    const cookie = getCookieHeader()
+    let mixinKey: string
+    try {
+      mixinKey = await getWbiMixinKey(cookie)
+    } catch (e) {
+      logger.warn('Failed to get WBI mixin key for Bilibili search:', e)
+      return Nothing()
+    }
+
+    const queryParams = encWbi(
+      {
+        search_type: 'video',
+        keyword: cleanKeyword,
+        page,
+        page_size: pageSize,
+        order: 'totalrank'
+      },
+      mixinKey
+    )
+
+    const queryString = Object.entries(queryParams)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&')
+
+    try {
+      const res = await fetch(`https://api.bilibili.com/x/web-interface/wbi/search/type?${queryString}`, {
+        headers: { ...COMMON_HEADERS, ...(cookie ? { Cookie: cookie } : {}) }
+      })
+
+      if (!res.ok) {
+        logger.error(`Bilibili search API returned HTTP ${res.status}: ${res.statusText}`)
+        return Nothing()
+      }
+
+      const json = (await res.json()) as {
+        code: number
+        message?: string
+        data?: {
+          result?: Array<{
+            bvid: string
+            title: string
+            author: string
+            pic: string
+            duration: string
+            play: number | string
+          }>
+        }
+      }
+
+      if (json.code !== 0 || !json.data || !Array.isArray(json.data.result)) {
+        return Just([])
+      }
+
+      const results: BiliSearchResult[] = json.data.result.map((item) => {
+        const cleanTitle = (item.title || '').replace(/<[^>]+>/g, '').trim()
+        const rawPic = item.pic || ''
+        const pic = rawPic.startsWith('//') ? `https:${rawPic}` : rawPic
+        const durSec = parseDurationStr(item.duration)
+        const playCount = typeof item.play === 'number' ? item.play : parseInt(String(item.play), 10) || 0
+
+        return {
+          bvid: item.bvid,
+          title: cleanTitle,
+          author: item.author || 'Bilibili',
+          pic,
+          duration: durSec,
+          durationStr: formatDurationSeconds(durSec),
+          play: playCount
+        }
+      })
+
+      return Just(results)
+    } catch (err) {
+      logger.error('Failed to search Bilibili videos:', err)
+      return Nothing()
+    }
+  }
+
+  export async function matchBestVideo(
+    songName: string,
+    artists: string[],
+    targetDuration?: number
+  ): Promise<Maybe<{ best: BiliSearchResult; score: number; candidates: BiliSearchResult[] }>> {
+    const primaryKeyword = `${songName} ${artists[0] || ''}`.trim()
+    const searchRes = await searchVideos(primaryKeyword, 1, 15)
+
+    let candidates: BiliSearchResult[] = []
+    searchRes.match({
+      Just: (res) => {
+        candidates = res
+      },
+      Nothing: () => {}
+    })
+
+    if (candidates.length === 0) {
+      const cleanName = songName.replace(/[(（[【].*?[)）\]】]/g, '').trim()
+      if (cleanName && cleanName !== primaryKeyword) {
+        const fallbackRes = await searchVideos(cleanName, 1, 10)
+        fallbackRes.match({
+          Just: (res) => {
+            candidates = res
+          },
+          Nothing: () => {}
+        })
+      }
+    }
+
+    if (candidates.length === 0) return Nothing()
+
+    const scored = candidates.map((candidate) => ({
+      candidate,
+      score: scoreCandidate(candidate, songName, artists, targetDuration)
+    }))
+
+    scored.sort((a, b) => b.score - a.score)
+
+    const top = scored[0]
+    if (top && top.score >= 50) {
+      return Just({ best: top.candidate, score: top.score, candidates })
+    }
+
+    return Nothing()
   }
 }

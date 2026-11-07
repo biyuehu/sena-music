@@ -3,7 +3,14 @@ import z from 'zod'
 import { Action, BodyExtracter, QueryExtracter } from '@/romi'
 import { Left, Right } from '@/romi/utils/adt/either'
 import { stringifyCatchError } from '@/romi/utils/common'
-import { saveCustomLyricSchema, settingsSchema, songLyricConfigSchema, songSourceTypeSchema } from '../common/types'
+import {
+  autoMatchBiliSongRequestSchema,
+  saveCustomLyricSchema,
+  searchBiliSongRequestSchema,
+  settingsSchema,
+  songLyricConfigSchema,
+  songSourceTypeSchema
+} from '../common/types'
 import { getCacheInfo, pruneCache } from './cache'
 import { type AppState, CONFIG } from './common'
 import { saveConfig } from './config'
@@ -544,4 +551,60 @@ export const saveCustomLyricHandler = Action.empty<AppState>()
       logger.error(`Failed to save custom lyric for song ${id}:`, err)
       return Left({ error: `Failed to save custom lyric: ${stringifyCatchError(err)}` })
     }
+  })
+
+export const searchBiliSongHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(searchBiliSongRequestSchema)] as const)
+  .bind(async ([{ keyword }], { logger }) => {
+    logger.info(`Searching Bilibili for keyword: "${keyword}"`)
+    const result = await BiliFetcher.searchVideos(keyword)
+    return result.match({
+      Just: (results) => Right({ results }),
+      Nothing: () => Left({ error: 'Failed to search Bilibili videos' })
+    })
+  })
+
+export const autoMatchBiliSongHandler = Action.empty<AppState>()
+  .use([new BodyExtracter(autoMatchBiliSongRequestSchema)] as const)
+  .bind(async ([{ songId }], { logger }) => {
+    logger.info(`Auto-matching Bilibili audio for song: ${songId}`)
+    const playlistRes = Data.load()
+    if (playlistRes.isLeft()) {
+      logger.error('Failed to load playlist:', playlistRes.value)
+      return Left({ error: `Failed to load playlist: ${stringifyCatchError(playlistRes.value)}` })
+    }
+
+    const playlist = playlistRes.value
+    const targetSong = playlist.find((s) => s.id === songId)
+    if (!targetSong) {
+      logger.warn(`Song with id ${songId} not found`)
+      return Left({ error: `Song with id ${songId} not found` })
+    }
+
+    const matchRes = await BiliFetcher.matchBestVideo(targetSong.name, targetSong.artists)
+    return matchRes.match({
+      Just: ({ best, score }) => {
+        logger.info(
+          `Auto-matched song "${targetSong.name}" to Bilibili ${best.bvid} (${best.title}) with score ${score}`
+        )
+        const updatedPlaylist = playlist.map((s) =>
+          s.id === songId ? { ...s, type: 'bili' as const, value: best.bvid } : s
+        )
+        try {
+          Data.save(updatedPlaylist)
+          return Right({
+            matched: best,
+            score,
+            playlist: updatedPlaylist
+          })
+        } catch (err) {
+          logger.error('Failed to save playlist after auto-matching Bilibili:', err)
+          return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
+        }
+      },
+      Nothing: () => {
+        logger.warn(`No suitable Bilibili match found for song "${targetSong.name}"`)
+        return Left({ error: `No suitable Bilibili match found for song "${targetSong.name}"` })
+      }
+    })
   })

@@ -103,3 +103,36 @@ export const saveCustomLyricSchema = z.object({
   romaji: z.string().optional().default('')
 })
 export type SaveCustomLyricRequest = z.infer<typeof saveCustomLyricSchema>
+
+export const biliSearchResultItemSchema = z.object({
+  bvid: z.string(),
+  title: z.string(),
+  author: z.string(),
+  pic: z.string(),
+  duration: z.number(),
+  durationStr: z.string(),
+  play: z.number()
+})
+export type BiliSearchResultItem = z.infer<typeof biliSearchResultItemSchema>
+
+export const searchBiliSongRequestSchema = z.object({
+  keyword: z.string().min(1)
+})
+export type SearchBiliSongRequest = z.infer<typeof searchBiliSongRequestSchema>
+
+export const searchBiliSongResponseSchema = z.object({
+  results: z.array(biliSearchResultItemSchema)
+})
+export type SearchBiliSongResponse = z.infer<typeof searchBiliSongResponseSchema>
+
+export const autoMatchBiliSongRequestSchema = z.object({
+  songId: z.string()
+})
+export type AutoMatchBiliSongRequest = z.infer<typeof autoMatchBiliSongRequestSchema>
+
+export const autoMatchBiliSongResponseSchema = z.object({
+  matched: biliSearchResultItemSchema,
+  score: z.number(),
+  playlist: playListSchema
+})
+export type AutoMatchBiliSongResponse = z.infer<typeof autoMatchBiliSongResponseSchema>
