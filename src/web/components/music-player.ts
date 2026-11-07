@@ -184,7 +184,9 @@ defineComponent(
       }
       document.addEventListener('visualizer-toggle', handleVisualizerToggle)
 
-      const handlePlayError = (index: number, error?: string): void => {
+      let isAutoMatchingBili = false
+
+      const fallbackNext = (index: number, error?: string): void => {
         const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
         const shouldAutoNext =
           autoNextEnabled && host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
@@ -204,6 +206,40 @@ defineComponent(
         }
       }
 
+      const handlePlayError = async (index: number, error?: string): Promise<void> => {
+        const currentSong = host.playlist[index]
+        const autoMatchBiliEnabled = Cache.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
+
+        if (currentSong && currentSong.type === 'netease' && autoMatchBiliEnabled && !isAutoMatchingBili) {
+          isAutoMatchingBili = true
+          host.isPlaying = false
+          if (host.visualizer) host.visualizer.setPlaying(false)
+          if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
+          showToast(`「${currentSong.name}」播放失败，正在尝试匹配 B站音源...`, 'info')
+
+          try {
+            const result = await httpClient.autoMatchBiliSong({ songId: currentSong.id })
+            if (result.isRight()) {
+              const { matched, playlist } = result.value
+              host.playlist = playlist
+              showToast(`已自动匹配并绑定 B站音源：${matched.title}`, 'success')
+              isAutoMatchingBili = false
+              if (host.currentIndex === index) {
+                host.actions?.play(index)
+              }
+              return
+            }
+          } catch (e) {
+            console.error('Failed to auto match bilibili song:', e)
+          }
+
+          showToast('未能匹配到合适 B站音源', 'error')
+          isAutoMatchingBili = false
+        }
+
+        fallbackNext(index, error)
+      }
+
       const actions: PlayerActions = {
         play: async (index: number, onlyLoad = false, startTime = 0): Promise<void> => {
           host.showVolumeBar = false
@@ -216,10 +252,11 @@ defineComponent(
           audio.currentTime = 0
           audio.pause()
           host.currentIndex = index
+          host.progress = 0
+          host.currentTime = startTime > 0 ? formatTime(startTime) : '00:00'
+          host.duration = '00:00'
 
-          if (startTime > 0) {
-            host.currentTime = formatTime(startTime)
-          } else {
+          if (startTime <= 0) {
             Cache.set('play-time', 0)
           }
 
@@ -531,6 +568,16 @@ defineComponent(
         if (Math.abs(time - lastSavedProgressTime) >= 1) {
           lastSavedProgressTime = time
           Cache.set('play-time', Math.floor(time * 10) / 10)
+        }
+      }
+
+      audio.onloadedmetadata = (): void => {
+        if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+          host.duration = formatTime(audio.duration)
+          if (!host.isDragging) {
+            host.progress = (audio.currentTime / audio.duration) * 100 || 0
+            host.currentTime = formatTime(audio.currentTime)
+          }
         }
       }
 

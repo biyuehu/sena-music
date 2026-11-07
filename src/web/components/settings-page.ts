@@ -30,6 +30,7 @@ defineComponent(
     initial: State<Settings>({ playlistId: 0, cacheMaxSize: 0 }),
     isDark: State(getEffectiveTheme() === 'dark'),
     autoNextOnError: State(true),
+    autoMatchBiliOnError: State(true),
     colorScheme: State<ColorScheme>(getStoredColorScheme()),
     theme: State<Theme>('auto'),
     cacheSize: State(0),
@@ -52,6 +53,7 @@ defineComponent(
       initTheme()
       host.apiBaseUrl = Cache.get<string>('api-base-url').unwrapOr('')
       host.autoNextOnError = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
+      host.autoMatchBiliOnError = Cache.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
       host.visualizerEnabled = Cache.get<boolean>('visualizer-enabled').unwrapOr(true)
       host.colorScheme = getStoredColorScheme()
       host.theme = getStoredTheme()
@@ -274,11 +276,27 @@ defineComponent(
                         <span class="text-xs font-bold opacity-50 uppercase tracking-wider">外观与播放</span>
                       </div>
 
-                      <label class="flex items-center justify-between gap-3">
+                      <label class="flex items-center justify-between gap-3 cursor-pointer">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-xs font-bold opacity-70">网易云源播放失败自动尝试匹配 B站音源</span>
+                          <span class="text-[11px] opacity-40">播放遇到版权或 VIP 限制失败时，自动搜索 B站匹配最佳音源并应用</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          class="w-4 h-4 cursor-pointer"
+                          .checked=${host.autoMatchBiliOnError}
+                          @change=${(e: Event) => {
+                            host.autoMatchBiliOnError = (e.target as HTMLInputElement).checked
+                            Cache.set('auto-match-bili-on-error', host.autoMatchBiliOnError, 86400 * 365)
+                          }}
+                        />
+                      </label>
+
+                      <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <span class="text-xs font-bold opacity-70">播放失败时自动切换到下一首</span>
                         <input
                           type="checkbox"
-                          class="w-4 h-4"
+                          class="w-4 h-4 cursor-pointer"
                           .checked=${host.autoNextOnError}
                           @change=${(e: Event) => {
                             host.autoNextOnError = (e.target as HTMLInputElement).checked
