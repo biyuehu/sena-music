@@ -3,9 +3,14 @@ import './toast'
 import { html, type TemplateResult } from 'lit-html'
 import { batch, defineComponent, State } from '@/romi/web'
 import type { Settings } from '../../common/types'
-import { Cache } from '../cache'
-import { httpClient } from '../client'
-import { getAppRoute } from '../router'
+import { httpClient } from '../service/client'
+import {
+  type CloseAction,
+  DEFAULT_DESKTOP_SHORTCUTS,
+  type DesktopShortcut,
+  getDesktopBridge,
+  isDesktopApp
+} from '../service/desktop'
 import {
   applyColorScheme,
   applyTheme,
@@ -16,8 +21,9 @@ import {
   initTheme,
   THEME_COLORS,
   type Theme
-} from '../theme'
-import { type DesktopShortcut, getDesktopBridge, isDesktopApp } from '../utils'
+} from '../service/theme'
+import { Cache } from '../utils/cache'
+import { getAppRoute } from '../utils/router'
 import { showToast } from './toast'
 
 defineComponent(
@@ -39,8 +45,9 @@ defineComponent(
     cleaningCache: State(false),
     visualizerEnabled: State(true),
     isDesktop: State(isDesktopApp()),
+    closeAction: State<CloseAction>('ask'),
     closeToTray: State(true),
-    desktopShortcuts: State<DesktopShortcut[]>([]),
+    desktopShortcuts: State<DesktopShortcut[]>(isDesktopApp() ? [...DEFAULT_DESKTOP_SHORTCUTS] : []),
     recordingActionId: State<string | null>(null)
   },
   {
@@ -136,16 +143,47 @@ defineComponent(
       window.addEventListener('hashchange', handleRouteChange)
       window.addEventListener('popstate', handleRouteChange)
 
-      if (isDesktopApp()) {
-        const bridge = getDesktopBridge()
-        if (bridge) {
-          bridge.getCloseToTray().then((val) => {
-            host.closeToTray = val
-          })
-          bridge.getShortcuts().then((list) => {
-            host.desktopShortcuts = list
-          })
+      const initDesktopConfig = (): void => {
+        if (isDesktopApp()) {
+          host.isDesktop = true
+          if (host.desktopShortcuts.length === 0) {
+            host.desktopShortcuts = [...DEFAULT_DESKTOP_SHORTCUTS]
+          }
+          const bridge = getDesktopBridge()
+          if (bridge) {
+            bridge.getCloseAction?.().then((action) => {
+              if (action) host.closeAction = action
+            })
+            bridge.getCloseToTray().then((val) => {
+              host.closeToTray = val
+            })
+            bridge.getShortcuts().then((list) => {
+              if (list && list.length > 0) {
+                host.desktopShortcuts = list
+              }
+            })
+            bridge.onCloseActionChanged?.((action) => {
+              host.closeAction = action
+            })
+          }
         }
+      }
+
+      const handleDesktopReady = (): void => {
+        initDesktopConfig()
+      }
+      window.addEventListener('sena-desktop-ready', handleDesktopReady)
+
+      if (isDesktopApp()) {
+        host.isDesktop = true
+        initDesktopConfig()
+        const timer = setInterval(() => {
+          if (getDesktopBridge()) {
+            initDesktopConfig()
+            clearInterval(timer)
+          }
+        }, 100)
+        setTimeout(() => clearInterval(timer), 5000)
       }
 
       const handleShortcutKeyDown = async (e: KeyboardEvent): Promise<void> => {
@@ -207,6 +245,7 @@ defineComponent(
       window.addEventListener('keydown', handleShortcutKeyDown, true)
 
       return () => {
+        window.removeEventListener('sena-desktop-ready', handleDesktopReady)
         document.removeEventListener('theme-change', handleThemeChange)
         window.removeEventListener('hashchange', handleRouteChange)
         window.removeEventListener('popstate', handleRouteChange)
@@ -444,28 +483,71 @@ defineComponent(
                         host.isDesktop
                           ? html`
                             <div class="border-t border-[var(--lx-border)] pt-5 mt-2">
-                              <span class="text-xs font-bold opacity-50 uppercase tracking-wider">桌面端增强设置</span>
+                              <span class="text-xs font-bold opacity-50 uppercase tracking-wider">桌面设置</span>
                             </div>
 
-                            <label class="flex items-center justify-between gap-3 cursor-pointer">
+                            <div class="flex flex-col gap-2">
                               <div class="flex flex-col gap-0.5">
-                                <span class="text-xs font-bold opacity-70">关闭主面板时最小化到系统托盘</span>
-                                <span class="text-[11px] opacity-40">开启后点击关闭按钮不会退出程序，继续在托盘后台运行并播放</span>
+                                <span class="text-xs font-bold opacity-70">关闭主面板时的操作</span>
+                                <span class="text-[11px] opacity-40">点击右上角关闭按钮时的默认行为（可在弹窗中勾选“记住选择”或在此修改）</span>
                               </div>
-                              <input
-                                type="checkbox"
-                                class="w-4 h-4 cursor-pointer"
-                                .checked=${host.closeToTray}
-                                @change=${async (e: Event) => {
-                                  host.closeToTray = (e.target as HTMLInputElement).checked
-                                  const bridge = getDesktopBridge()
-                                  if (bridge) {
-                                    await bridge.setCloseToTray(host.closeToTray)
-                                    showToast('设置已保存', 'success')
-                                  }
-                                }}
-                              />
-                            </label>
+                              <div class="grid grid-cols-3 gap-2">
+                                <button
+                                  type="button"
+                                  class="text-xs py-2 px-2.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                                    host.closeAction === 'ask'
+                                      ? 'bg-[var(--lx-accent)] text-white border-[var(--lx-accent)] font-semibold'
+                                      : 'bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border-[var(--lx-border)] text-[var(--lx-text)]'
+                                  }"
+                                  @click=${async () => {
+                                    host.closeAction = 'ask'
+                                    const bridge = getDesktopBridge()
+                                    if (bridge?.setCloseAction) {
+                                      await bridge.setCloseAction('ask')
+                                      showToast('已设为：关闭时每次询问', 'info')
+                                    }
+                                  }}
+                                >
+                                  每次询问
+                                </button>
+                                <button
+                                  type="button"
+                                  class="text-xs py-2 px-2.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                                    host.closeAction === 'tray'
+                                      ? 'bg-[var(--lx-accent)] text-white border-[var(--lx-accent)] font-semibold'
+                                      : 'bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border-[var(--lx-border)] text-[var(--lx-text)]'
+                                  }"
+                                  @click=${async () => {
+                                    host.closeAction = 'tray'
+                                    const bridge = getDesktopBridge()
+                                    if (bridge?.setCloseAction) {
+                                      await bridge.setCloseAction('tray')
+                                      showToast('已设为：最小化到托盘并在后台运行', 'info')
+                                    }
+                                  }}
+                                >
+                                  最小化到托盘
+                                </button>
+                                <button
+                                  type="button"
+                                  class="text-xs py-2 px-2.5 rounded-lg border text-center transition-colors cursor-pointer ${
+                                    host.closeAction === 'quit'
+                                      ? 'bg-[var(--lx-accent)] text-white border-[var(--lx-accent)] font-semibold'
+                                      : 'bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border-[var(--lx-border)] text-[var(--lx-text)]'
+                                  }"
+                                  @click=${async () => {
+                                    host.closeAction = 'quit'
+                                    const bridge = getDesktopBridge()
+                                    if (bridge?.setCloseAction) {
+                                      await bridge.setCloseAction('quit')
+                                      showToast('已设为：直接退出程序', 'info')
+                                    }
+                                  }}
+                                >
+                                  直接退出程序
+                                </button>
+                              </div>
+                            </div>
 
                             <div class="flex flex-col gap-2 mt-1">
                               <div class="flex items-center justify-between">

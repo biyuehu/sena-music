@@ -1,8 +1,8 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
 import packageJson from '../../../package.json'
-import { type AppRoute, getAppRoute, navigateTo } from '../router'
-import { getEffectiveTheme, initTheme } from '../theme'
+import { getEffectiveTheme, initTheme } from '../service/theme'
+import { type AppRoute, getAppRoute, navigateTo } from '../utils/router'
 
 export const sideNav = defineComponent(
   'side-nav',

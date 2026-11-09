@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('senaDesktop', {
     ipcRenderer.invoke('desktop:set-shortcut', { id, key, enabled }),
   checkShortcut: (id: string, key: string) => ipcRenderer.invoke('desktop:check-shortcut', { id, key }),
   resetShortcuts: () => ipcRenderer.invoke('desktop:reset-shortcuts'),
+  getCloseAction: () => ipcRenderer.invoke('desktop:get-close-action'),
+  setCloseAction: (action: 'ask' | 'tray' | 'quit') => ipcRenderer.invoke('desktop:set-close-action', action),
   getCloseToTray: () => ipcRenderer.invoke('desktop:get-close-to-tray'),
   setCloseToTray: (enabled: boolean) => ipcRenderer.invoke('desktop:set-close-to-tray', enabled),
   syncPlaybackState: (state: { isPlaying: boolean; title?: string; artist?: string }) =>
@@ -17,5 +19,16 @@ contextBridge.exposeInMainWorld('senaDesktop', {
     return () => {
       ipcRenderer.removeListener('player-command', listener)
     }
+  },
+  onCloseActionChanged: (callback: (action: string) => void) => {
+    const listener = (_: unknown, action: string) => callback(action)
+    ipcRenderer.on('desktop:close-action-changed', listener)
+    return () => {
+      ipcRenderer.removeListener('desktop:close-action-changed', listener)
+    }
   }
 })
+
+try {
+  window.dispatchEvent(new CustomEvent('sena-desktop-ready'))
+} catch {}

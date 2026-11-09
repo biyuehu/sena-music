@@ -10,18 +10,19 @@ import type { Known } from '@/romi/utils/types'
 import { defineComponent, Ref, State } from '@/romi/web'
 import type { Playlist, SongInfo } from '../../common/types'
 import { PLAYLIST_SONG_ORDER_GAP } from '../../server/constant'
-import { Cache } from '../cache'
-import { httpClient } from '../client'
+import { httpClient } from '../service/client'
+import { getDesktopBridge, isDesktopApp } from '../service/desktop'
+import { AudioVisualizer } from '../service/visualizer'
+import { formatTime, getSongUrl } from '../utils'
+import { Cache } from '../utils/cache'
 import {
   findActiveLyricIndex,
   getStoredLyricPreference,
   mergeThreeTrackLyrics,
   type ParsedLyricLine,
   saveStoredLyricPreference
-} from '../lyric'
-import { type AppRoute, getAppRoute } from '../router'
-import { formatTime, getDesktopBridge, getSongUrl } from '../utils'
-import { AudioVisualizer } from '../visualizer'
+} from '../utils/lyric'
+import { type AppRoute, getAppRoute } from '../utils/router'
 import { showToast } from './toast'
 
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
@@ -1011,31 +1012,58 @@ defineComponent(
         }
       }
 
-      const desktopBridge = getDesktopBridge()
       let unsubscribeDesktop: (() => void) | undefined
-      if (desktopBridge) {
-        unsubscribeDesktop = desktopBridge.onPlayerCommand((command) => {
-          switch (command) {
-            case 'toggle':
-              host.actions?.toggle()
-              break
-            case 'prev':
-              host.actions?.prev()
-              break
-            case 'next':
-              host.actions?.next()
-              break
-            case 'volumeUp':
-              host.actions?.setVolume(Math.min(1, Math.round((host.volume + 0.05) * 100) / 100))
-              break
-            case 'volumeDown':
-              host.actions?.setVolume(Math.max(0, Math.round((host.volume - 0.05) * 100) / 100))
-              break
+      const setupDesktopBridge = (): void => {
+        const desktopBridge = getDesktopBridge()
+        if (desktopBridge && !unsubscribeDesktop) {
+          unsubscribeDesktop = desktopBridge.onPlayerCommand((command) => {
+            switch (command) {
+              case 'toggle':
+                host.actions?.toggle()
+                break
+              case 'prev':
+                host.actions?.prev()
+                break
+              case 'next':
+                host.actions?.next()
+                break
+              case 'volumeUp':
+                host.actions?.setVolume(Math.min(1, Math.round((host.volume + 0.05) * 100) / 100))
+                break
+              case 'volumeDown':
+                host.actions?.setVolume(Math.max(0, Math.round((host.volume - 0.05) * 100) / 100))
+                break
+            }
+          })
+          const current = host.playlist[host.currentIndex]
+          if (current) {
+            desktopBridge.syncPlaybackState({
+              isPlaying: host.isPlaying,
+              title: current.name,
+              artist: current.artists?.join(' / ')
+            })
           }
-        })
+        }
+      }
+
+      const handleDesktopReady = (): void => {
+        setupDesktopBridge()
+      }
+      window.addEventListener('sena-desktop-ready', handleDesktopReady)
+
+      if (isDesktopApp()) {
+        setupDesktopBridge()
+        if (!unsubscribeDesktop) {
+          const timer = setInterval(() => {
+            setupDesktopBridge()
+            if (unsubscribeDesktop) clearInterval(timer)
+          }, 100)
+          setTimeout(() => clearInterval(timer), 5000)
+        }
       }
 
       return (): void => {
+        window.removeEventListener('sena-desktop-ready', handleDesktopReady)
         if (unsubscribeDesktop) unsubscribeDesktop()
         document.removeEventListener('visualizer-toggle', handleVisualizerToggle)
         if (host.visualizer) {

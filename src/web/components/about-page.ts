@@ -2,7 +2,7 @@ import './theme-toggle'
 import { html, type TemplateResult } from 'lit-html'
 import { defineComponent } from '@/romi/web'
 import packageJson from '../../../package.json'
-import { initTheme } from '../theme'
+import { initTheme } from '../service/theme'
 
 export const AboutPage = defineComponent(
   'about-page',
