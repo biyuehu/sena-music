@@ -332,7 +332,14 @@ defineComponent(
             if (host.visualizer) host.visualizer.setPlaying(true)
             Cache.set('play-song', `${host.currentIndex}|${host.playlist[host.currentIndex].name}`)
           } catch (err) {
-            console.error('Failed to play:', err)
+            if ((err as { name?: string })?.name === 'AbortError') {
+              return
+            }
+            if ((err as { name?: string })?.name === 'NotAllowedError') {
+              host.isPlaying = false
+              return
+            }
+            console.error('Play failed:', err)
             handlePlayError(index)
           }
         },
@@ -651,13 +658,21 @@ defineComponent(
               Right: ({ playlist }) => {
                 host.playlist = playlist
                 showToast('更新成功', 'success')
-                if (host.playlist[host.currentIndex]?.id === e.detail.id) host.actions?.play(host.currentIndex)
+                if (host.playlist[host.currentIndex]?.id === e.detail.id) {
+                  audio.src = ''
+                  host.actions?.play(host.currentIndex)
+                }
               },
-              Left: () => showToast('更新失败', 'error')
+              Left: ({ error }) => showToast(`更新失败：${error || '未知错误'}`, 'error')
             })
           )
+          .catch((err) => {
+            console.error('Failed to set song source:', err)
+            showToast('更新异常', 'error')
+          })
           .finally(() => {
             host.editModalOpen = false
+            host.editingSong = null
           })
       }
 

@@ -33,9 +33,18 @@ export const editSongModal = defineComponent(
       }
     `,
     render: (host) => {
-      if (!host.isOpen || !host.song) return html``
-      if (host.draft?.id !== host.song.id) {
+      if (!host.isOpen) {
+        host.draft = null
+        host.isLoading = false
+        host.biliSearchModalOpen = false
+        host.biliSearchResults = []
+        host.biliSearching = false
+        return html``
+      }
+      if (!host.song) return html``
+      if (!host.draft || host.draft.id !== host.song.id) {
         host.draft = { ...host.song }
+        host.isLoading = false
         host.lyricType = host.song.lyricConfig?.type ?? 'auto'
         host.lyricValue = host.song.lyricConfig?.value ?? ''
         host.lyricOffset = host.song.lyricConfig?.offset ?? 0
@@ -139,9 +148,12 @@ export const editSongModal = defineComponent(
             composed: true
           })
           host.dispatchEvent(event)
+          host.draft = null
+          host.isOpen = false
         } catch (err) {
           console.error('Failed to edit song:', err)
           showToast('编辑失败', 'error')
+        } finally {
           host.isLoading = false
         }
       }
@@ -449,7 +461,7 @@ export const editSongModal = defineComponent(
                                   : 'border-[var(--lx-border)] hover:border-[var(--lx-accent)]'
                               }"
                               @click=${() => {
-                                host.draft = { ...draft, value: item.bvid }
+                                host.draft = { ...draft, type: 'bili', value: item.bvid }
                                 host.biliSearchModalOpen = false
                                 showToast(`已选择：${item.title} (${item.bvid})`, 'success')
                               }}
