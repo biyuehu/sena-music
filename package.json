@@ -71,6 +71,8 @@
     },
     "files": [
       "dist/desktop/**",
+      "logo.png",
+      "logo.ico",
       "package.json"
     ],
     "extraMetadata": {
@@ -87,7 +89,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "logo.ico"
     }
   },
   "electronmon": {
