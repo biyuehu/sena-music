@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { parseHexOrRgbColor } from '../src/web/visualizer'
+import { parseHexOrRgbColor } from '../src/web/service/visualizer'
 
 describe('Visualizer Color Parsing', () => {
   it('should parse 6-character hex correctly', () => {

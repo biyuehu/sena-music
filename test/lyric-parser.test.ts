@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { findActiveLyricIndex, mergeThreeTrackLyrics, parseSingleLrc } from '../src/web/lyric'
+import { findActiveLyricIndex, mergeThreeTrackLyrics, parseSingleLrc } from '../src/web/utils/lyric'
 
 describe('Lyric Parser', () => {
   const original = `[ti:Lemon]

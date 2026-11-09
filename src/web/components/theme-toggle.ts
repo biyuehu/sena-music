@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import { applyTheme, getStoredTheme, type Theme } from '../theme'
+import { applyTheme, getStoredTheme, type Theme } from '../service/theme'
 
 export const ThemeToggle = defineComponent(
   'theme-toggle',

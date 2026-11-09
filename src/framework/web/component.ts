@@ -3,7 +3,7 @@
 
 import type { TemplateResult } from 'lit-html'
 import { html, render } from 'lit-html'
-import { batch, Effect, effect, signal } from 'usignal'
+import { batch, Effect, signal } from 'usignal'
 import { Variant } from '@/romi/utils/adt'
 import { buildSheets, globalStyleWatcher } from './sheets'
 

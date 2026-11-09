@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { getAppRoute, navigateTo } from '../src/web/router'
+import { getAppRoute, navigateTo } from '../src/web/utils/router'
 
 describe('Router', () => {
   const originalWindow = globalThis.window

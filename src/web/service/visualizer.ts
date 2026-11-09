@@ -1,4 +1,4 @@
-import { Cache } from './cache'
+import { Cache } from '../utils/cache'
 
 export interface VisualizerOptions {
   canvas: HTMLCanvasElement

@@ -1,7 +1,7 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
 import type { BiliSearchResultItem, SongInfo, SongLyricSourceType, SongSourceType } from '../../common/types'
-import { httpClient } from '../client'
+import { httpClient } from '../service/client'
 import { showToast } from './toast'
 
 export const editSongModal = defineComponent(
