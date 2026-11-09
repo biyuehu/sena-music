@@ -1,7 +1,7 @@
 import { createClient } from '@/romi/client'
 import type { AppRouter } from '../../server/app'
-import { Cache } from '../utils/cache'
+import { Storage } from '../utils/storage'
 
 export const httpClient = createClient<AppRouter>({
-  baseUrl: Cache.get<string>('api-base-url').unwrapOrElse(() => '')
+  baseUrl: Storage.get<string>('api-base-url').unwrapOrElse(() => '')
 })

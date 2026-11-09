@@ -10,41 +10,54 @@ export namespace Cache {
     return `sena-cache:${key}`
   }
 
-  export function set<T extends Value>(key: string, value: T, seconds: number = 86400 * 365): void {
-    localStorage.setItem(genKey(key), JSON.stringify({ time: Date.now() + seconds * 1000, value }))
+  export function set<T extends Value>(key: string, value: T, seconds: number = 3600): void {
+    if (typeof localStorage === 'undefined') return
+    try {
+      localStorage.setItem(genKey(key), JSON.stringify({ time: Date.now() + seconds * 1000, value }))
+    } catch {}
   }
 
   export function get<T extends Value>(key: string): Maybe<T> {
+    if (typeof localStorage === 'undefined') return Nothing()
     const data = localStorage.getItem(genKey(key))
     if (data === null) return Nothing()
-    const parsed = schema.safeParse(JSON.parse(data))
-    if (parsed.success) {
-      const { time, value } = parsed.data
-      if (time > Date.now()) return Just(value as T)
-      remove(key)
-      return Nothing()
-    }
+    try {
+      const parsed = schema.safeParse(JSON.parse(data))
+      if (parsed.success) {
+        const { time, value } = parsed.data
+        if (time > Date.now()) return Just(value as T)
+        remove(key)
+        return Nothing()
+      }
+    } catch {}
     remove(key)
     return Nothing()
   }
 
   export function remove(key: string): void {
-    localStorage.removeItem(genKey(key))
+    if (typeof localStorage === 'undefined') return
+    try {
+      localStorage.removeItem(genKey(key))
+    } catch {}
   }
 
-  export function getOr<T extends Value>(key: string, defaultFn: () => T): T {
-    return get(key).unwrapOrElse(() => {
+  export function getOr<T extends Value>(key: string, defaultFn: () => T, seconds: number = 3600): T {
+    return get<T>(key).unwrapOrElse(() => {
       const value = defaultFn()
-      set(key, value)
+      set(key, value, seconds)
       return value
-    }) as T
+    })
   }
 
-  export async function getOrAsync<T extends Value>(key: string, defaultFn: () => Promise<T>): Promise<T> {
-    const result = get(key)
+  export async function getOrAsync<T extends Value>(
+    key: string,
+    defaultFn: () => Promise<T>,
+    seconds: number = 3600
+  ): Promise<T> {
+    const result = get<T>(key)
     if (result.isJust()) return result.value as T
     const value = await defaultFn()
-    set(key, value)
+    set(key, value, seconds)
     return value
   }
 }

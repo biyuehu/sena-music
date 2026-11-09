@@ -1,4 +1,4 @@
-import { Cache } from '../utils/cache'
+import { Storage } from '../utils/storage'
 
 export type Theme = 'light' | 'dark' | 'auto'
 
@@ -36,7 +36,7 @@ const LEGACY_SCHEME_MAP: Record<string, ColorScheme> = {
 }
 
 export function getStoredColorScheme(): ColorScheme {
-  const cached = Cache.get<string>('color-scheme')
+  const cached = Storage.get<string>('color-scheme')
   if (cached.isJust()) {
     const val = cached.value
     if (COLOR_SCHEMES[val as ColorScheme]) {
@@ -54,7 +54,7 @@ export function applyColorScheme(scheme: ColorScheme): void {
   const effective = getEffectiveTheme()
   const accent = effective === 'dark' ? colors.dark : colors.light
   document.documentElement.style.setProperty('--lx-accent', accent)
-  Cache.set('color-scheme', scheme, 86400 * 365)
+  Storage.set('color-scheme', scheme)
 }
 
 export function initColorScheme(): void {
@@ -67,7 +67,7 @@ export function getSystemTheme(): 'light' | 'dark' {
 }
 
 export function getStoredTheme(): Theme {
-  return Cache.get<string>('theme').unwrapOrElse(() => 'auto') as Theme
+  return Storage.get<string>('theme').unwrapOrElse(() => 'auto') as Theme
 }
 
 export function getEffectiveTheme(): 'light' | 'dark' {
@@ -90,7 +90,7 @@ export function applyTheme(theme: Theme): void {
     }
     document.dispatchEvent(new CustomEvent('theme-change', { detail: { theme, effective } }))
   }
-  Cache.set('theme', theme, 86400 * 365)
+  Storage.set('theme', theme)
 }
 
 export function toggleTheme(): 'light' | 'dark' {

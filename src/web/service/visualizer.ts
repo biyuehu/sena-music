@@ -1,4 +1,4 @@
-import { Cache } from '../utils/cache'
+import { Storage } from '../utils/storage'
 
 export interface VisualizerOptions {
   canvas: HTMLCanvasElement
@@ -68,7 +68,7 @@ export class AudioVisualizer {
     this.canvas = options.canvas
     this.audio = options.audio
     this.ctx = this.canvas.getContext('2d')
-    this.enabled = Cache.get<boolean>('visualizer-enabled').unwrapOr(true)
+    this.enabled = Storage.get<boolean>('visualizer-enabled').unwrapOr(true)
 
     this.initParticles()
     this.initResizeObserver()

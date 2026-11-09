@@ -24,6 +24,7 @@ import {
 } from '../service/theme'
 import { Cache } from '../utils/cache'
 import { getAppRoute } from '../utils/router'
+import { Storage } from '../utils/storage'
 import { showToast } from './toast'
 
 defineComponent(
@@ -67,10 +68,10 @@ defineComponent(
     `,
     connectedCallback: (host): (() => void) => {
       initTheme()
-      host.apiBaseUrl = Cache.get<string>('api-base-url').unwrapOr('')
-      host.autoNextOnError = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
-      host.autoMatchBiliOnError = Cache.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
-      host.visualizerEnabled = Cache.get<boolean>('visualizer-enabled').unwrapOr(true)
+      host.apiBaseUrl = Storage.get<string>('api-base-url').unwrapOr('')
+      host.autoNextOnError = Storage.get<boolean>('auto-next-on-error').unwrapOr(true)
+      host.autoMatchBiliOnError = Storage.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
+      host.visualizerEnabled = Storage.get<boolean>('visualizer-enabled').unwrapOr(true)
       host.colorScheme = getStoredColorScheme()
       host.theme = getStoredTheme()
 
@@ -266,7 +267,7 @@ defineComponent(
       const changed = host.playlistId !== host.initial.playlistId || host.cacheMaxSize !== host.initial.cacheMaxSize
 
       const save = (): void => {
-        Cache.set('api-base-url', host.apiBaseUrl.trim(), 86400 * 365)
+        Storage.set('api-base-url', host.apiBaseUrl.trim())
         if (!changed) return void showToast('设置已保存', 'success')
         host.saving = true
         httpClient
@@ -413,7 +414,7 @@ defineComponent(
                           .checked=${host.autoMatchBiliOnError}
                           @change=${(e: Event) => {
                             host.autoMatchBiliOnError = (e.target as HTMLInputElement).checked
-                            Cache.set('auto-match-bili-on-error', host.autoMatchBiliOnError, 86400 * 365)
+                            Storage.set('auto-match-bili-on-error', host.autoMatchBiliOnError)
                           }}
                         />
                       </label>
@@ -426,7 +427,7 @@ defineComponent(
                           .checked=${host.autoNextOnError}
                           @change=${(e: Event) => {
                             host.autoNextOnError = (e.target as HTMLInputElement).checked
-                            Cache.set('auto-next-on-error', host.autoNextOnError, 86400 * 365)
+                            Storage.set('auto-next-on-error', host.autoNextOnError)
                           }}
                         />
                       </label>
@@ -442,7 +443,7 @@ defineComponent(
                           .checked=${host.visualizerEnabled}
                           @change=${(e: Event) => {
                             host.visualizerEnabled = (e.target as HTMLInputElement).checked
-                            Cache.set('visualizer-enabled', host.visualizerEnabled, 86400 * 365)
+                            Storage.set('visualizer-enabled', host.visualizerEnabled)
                             document.dispatchEvent(
                               new CustomEvent('visualizer-toggle', { detail: { enabled: host.visualizerEnabled } })
                             )

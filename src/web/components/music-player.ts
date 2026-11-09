@@ -14,7 +14,6 @@ import { httpClient } from '../service/client'
 import { getDesktopBridge, isDesktopApp } from '../service/desktop'
 import { AudioVisualizer } from '../service/visualizer'
 import { formatTime, getSongUrl } from '../utils'
-import { Cache } from '../utils/cache'
 import {
   findActiveLyricIndex,
   getStoredLyricPreference,
@@ -23,6 +22,7 @@ import {
   saveStoredLyricPreference
 } from '../utils/lyric'
 import { type AppRoute, getAppRoute } from '../utils/router'
+import { Storage } from '../utils/storage'
 import { showToast } from './toast'
 
 type PlayMode = 'list-loop' | 'random' | 'single-loop' | 'stop'
@@ -100,7 +100,7 @@ defineComponent(
     }),
     currentRoute: State<AppRoute>(getAppRoute()),
     visualizer: Ref<AudioVisualizer | null>(null),
-    visualizerEnabled: State<boolean>(Cache.get<boolean>('visualizer-enabled').unwrapOr(true))
+    visualizerEnabled: State<boolean>(Storage.get<boolean>('visualizer-enabled').unwrapOr(true))
   },
   {
     useGlobalStyles: true,
@@ -116,15 +116,13 @@ defineComponent(
       `,
 
     connectedCallback: (host): (() => void) => {
-      const LONG_CACHE_TTL = 86400 * 365
-
       const savePlaybackSong = (index: number, song?: SongInfo): void => {
         if (!song) return
-        Cache.set('play-song', `${index}|${song.id}|${song.name}`, LONG_CACHE_TTL)
+        Storage.set('play-song', `${index}|${song.id}|${song.name}`)
       }
 
       const savePlaybackTime = (time: number): void => {
-        Cache.set('play-time', Math.floor(time * 10) / 10, LONG_CACHE_TTL)
+        Storage.set('play-time', Math.floor(time * 10) / 10)
       }
 
       const updatePlaylistPreservingCurrent = (newPlaylist: Playlist): void => {
@@ -151,9 +149,9 @@ defineComponent(
               Right: ({ playlist }) => {
                 host.playlist = playlist
                 host.playlistError = Nothing()
-                const lastPlayCache = Cache.get<string>('play-song')
-                if (lastPlayCache.isNothing()) return
-                const raw = lastPlayCache.value
+                const lastPlayStorage = Storage.get<string>('play-song')
+                if (lastPlayStorage.isNothing()) return
+                const raw = lastPlayStorage.value
                 let targetIndex = -1
                 const parts = raw.split('|')
 
@@ -191,12 +189,12 @@ defineComponent(
                 }
 
                 if (targetIndex === -1) {
-                  Cache.remove('play-song')
-                  Cache.remove('play-time')
+                  Storage.remove('play-song')
+                  Storage.remove('play-time')
                   return
                 }
 
-                const savedTime = Math.max(0, Cache.get<number>('play-time').unwrapOr(0))
+                const savedTime = Math.max(0, Storage.get<number>('play-time').unwrapOr(0))
                 savePlaybackSong(targetIndex, playlist[targetIndex])
                 host.actions?.play(targetIndex, true, savedTime)
               },
@@ -293,7 +291,7 @@ defineComponent(
       }
 
       const fallbackNext = (index: number, error?: string): void => {
-        const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
+        const autoNextEnabled = Storage.get<boolean>('auto-next-on-error').unwrapOr(true)
         const shouldAutoNext =
           autoNextEnabled && host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
@@ -315,7 +313,7 @@ defineComponent(
 
       const handlePlayError = async (index: number, error?: string): Promise<void> => {
         const currentSong = host.playlist[index]
-        const autoMatchBiliEnabled = Cache.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
+        const autoMatchBiliEnabled = Storage.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
 
         if (currentSong && currentSong.type === 'netease' && autoMatchBiliEnabled && !isAutoMatchingBili) {
           isAutoMatchingBili = true
@@ -511,7 +509,7 @@ defineComponent(
           host.showVolumeBar = false
           const modes: PlayMode[] = ['list-loop', 'random', 'single-loop', 'stop']
           host.playMode = modes[(modes.indexOf(host.playMode) + 1) % modes.length]
-          Cache.set('play-mode', host.playMode, LONG_CACHE_TTL)
+          Storage.set('play-mode', host.playMode)
         },
         seekToRatio: (ratio: number, previewOnly = false): void => {
           host.showVolumeBar = false
@@ -540,7 +538,7 @@ defineComponent(
         setVolume: (val: number): void => {
           if (val > 0) lastVolume = val
           audio.volume = host.volume = val
-          Cache.set('play-volume', val, LONG_CACHE_TTL)
+          Storage.set('play-volume', val)
         },
         toggleFullscreen: (): void => {
           host.showVolumeBar = false
@@ -981,8 +979,8 @@ defineComponent(
       window.addEventListener('keydown', handleGlobalKeyDown)
       window.addEventListener('resize', handleGlobalResize)
 
-      const volume = Cache.get<number>('play-volume')
-      const mode = Cache.get<PlayMode>('play-mode')
+      const volume = Storage.get<number>('play-volume')
+      const mode = Storage.get<PlayMode>('play-mode')
       if (volume.isJust()) host.actions.setVolume(volume.value)
       if (mode.isJust()) host.playMode = mode.value
 
