@@ -70,7 +70,7 @@
       "output": "release"
     },
     "files": [
-      "dist/desktop/main.js",
+      "dist/desktop/**",
       "package.json"
     ],
     "extraMetadata": {

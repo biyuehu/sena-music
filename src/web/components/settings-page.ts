@@ -17,6 +17,7 @@ import {
   THEME_COLORS,
   type Theme
 } from '../theme'
+import { type DesktopShortcut, getDesktopBridge, isDesktopApp } from '../utils'
 import { showToast } from './toast'
 
 defineComponent(
@@ -36,7 +37,11 @@ defineComponent(
     cacheSize: State(0),
     cachePath: State(''),
     cleaningCache: State(false),
-    visualizerEnabled: State(true)
+    visualizerEnabled: State(true),
+    isDesktop: State(isDesktopApp()),
+    closeToTray: State(true),
+    desktopShortcuts: State<DesktopShortcut[]>([]),
+    recordingActionId: State<string | null>(null)
   },
   {
     useGlobalStyles: true,
@@ -130,10 +135,82 @@ defineComponent(
       document.addEventListener('theme-change', handleThemeChange)
       window.addEventListener('hashchange', handleRouteChange)
       window.addEventListener('popstate', handleRouteChange)
+
+      if (isDesktopApp()) {
+        const bridge = getDesktopBridge()
+        if (bridge) {
+          bridge.getCloseToTray().then((val) => {
+            host.closeToTray = val
+          })
+          bridge.getShortcuts().then((list) => {
+            host.desktopShortcuts = list
+          })
+        }
+      }
+
+      const handleShortcutKeyDown = async (e: KeyboardEvent): Promise<void> => {
+        if (!host.recordingActionId) return
+        e.preventDefault()
+        e.stopPropagation()
+
+        if (e.key === 'Escape') {
+          host.recordingActionId = null
+          return
+        }
+
+        const bridge = getDesktopBridge()
+        if (!bridge) return
+
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+          const res = await bridge.setShortcut(host.recordingActionId, '', false)
+          if (res.success) {
+            host.desktopShortcuts = await bridge.getShortcuts()
+            showToast('快捷键已清除', 'info')
+          }
+          host.recordingActionId = null
+          return
+        }
+
+        if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return
+
+        const parts: string[] = []
+        if (e.ctrlKey) parts.push('CommandOrControl')
+        if (e.altKey) parts.push('Alt')
+        if (e.shiftKey) parts.push('Shift')
+        if (e.metaKey && !e.ctrlKey) parts.push('Super')
+
+        let keyName = e.code
+        if (keyName.startsWith('Key')) keyName = keyName.slice(3)
+        else if (keyName.startsWith('Digit')) keyName = keyName.slice(5)
+        else if (keyName === 'Space') keyName = 'Space'
+        else if (keyName.startsWith('Arrow')) keyName = keyName.slice(5)
+        else keyName = e.key.toUpperCase()
+
+        const accelerator = [...parts, keyName].join('+')
+
+        const check = await bridge.checkShortcut(host.recordingActionId, accelerator)
+        if (!check.success) {
+          showToast(check.error || '快捷键冲突或不合法', 'error')
+          return
+        }
+
+        const saveRes = await bridge.setShortcut(host.recordingActionId, accelerator, true)
+        if (saveRes.success) {
+          host.desktopShortcuts = await bridge.getShortcuts()
+          showToast('快捷键已更新', 'success')
+          host.recordingActionId = null
+        } else {
+          showToast(saveRes.error || '保存快捷键失败', 'error')
+        }
+      }
+
+      window.addEventListener('keydown', handleShortcutKeyDown, true)
+
       return () => {
         document.removeEventListener('theme-change', handleThemeChange)
         window.removeEventListener('hashchange', handleRouteChange)
         window.removeEventListener('popstate', handleRouteChange)
+        window.removeEventListener('keydown', handleShortcutKeyDown, true)
       }
     },
     render: (host): TemplateResult => {
@@ -362,6 +439,132 @@ defineComponent(
                           )}
                         </select>
                       </label>
+
+                      ${
+                        host.isDesktop
+                          ? html`
+                            <div class="border-t border-[var(--lx-border)] pt-5 mt-2">
+                              <span class="text-xs font-bold opacity-50 uppercase tracking-wider">桌面端增强设置</span>
+                            </div>
+
+                            <label class="flex items-center justify-between gap-3 cursor-pointer">
+                              <div class="flex flex-col gap-0.5">
+                                <span class="text-xs font-bold opacity-70">关闭主面板时最小化到系统托盘</span>
+                                <span class="text-[11px] opacity-40">开启后点击关闭按钮不会退出程序，继续在托盘后台运行并播放</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                class="w-4 h-4 cursor-pointer"
+                                .checked=${host.closeToTray}
+                                @change=${async (e: Event) => {
+                                  host.closeToTray = (e.target as HTMLInputElement).checked
+                                  const bridge = getDesktopBridge()
+                                  if (bridge) {
+                                    await bridge.setCloseToTray(host.closeToTray)
+                                    showToast('设置已保存', 'success')
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            <div class="flex flex-col gap-2 mt-1">
+                              <div class="flex items-center justify-between">
+                                <div class="flex flex-col gap-0.5">
+                                  <span class="text-xs font-bold opacity-70">全局快捷键</span>
+                                  <span class="text-[11px] opacity-40">在其他窗口或全屏程序下依然可盲操控制播放（支持自定义与冲突检测）</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  class="text-xs px-2.5 py-1 rounded bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors cursor-pointer"
+                                  @click=${async () => {
+                                    const bridge = getDesktopBridge()
+                                    if (bridge) {
+                                      const reset = await bridge.resetShortcuts()
+                                      if (reset) {
+                                        host.desktopShortcuts = reset
+                                        host.recordingActionId = null
+                                        showToast('全局快捷键已恢复默认', 'success')
+                                      }
+                                    }
+                                  }}
+                                >
+                                  恢复默认
+                                </button>
+                              </div>
+
+                              <div class="space-y-2 mt-1">
+                                ${host.desktopShortcuts.map((item) => {
+                                  const isRecording = host.recordingActionId === item.id
+                                  const formatAccelerator = (acc: string): string => {
+                                    if (!acc) return '未设置'
+                                    return acc
+                                      .replace(/CommandOrControl/gi, 'Ctrl')
+                                      .replace(/Control/gi, 'Ctrl')
+                                      .replace(/\+/g, ' + ')
+                                  }
+                                  return html`
+                                    <div
+                                      class="flex items-center justify-between p-2.5 rounded-lg border transition-colors ${
+                                        isRecording
+                                          ? 'border-[var(--lx-accent)] bg-[var(--lx-hover)]'
+                                          : 'border-[var(--lx-border)] bg-[var(--lx-bg-alt)]'
+                                      }"
+                                    >
+                                      <div class="flex flex-col gap-0.5 min-w-0 pr-2">
+                                        <span class="text-xs font-semibold text-[var(--lx-text)]">${item.name}</span>
+                                        <span class="text-[11px] font-mono ${isRecording ? 'text-[var(--lx-accent)] font-medium animate-pulse' : 'opacity-60'}">
+                                          ${
+                                            isRecording
+                                              ? '请在键盘上按下新快捷键组合（Esc取消，Backspace清除）...'
+                                              : formatAccelerator(item.currentKey)
+                                          }
+                                        </span>
+                                      </div>
+                                      <div class="flex items-center gap-2 flex-none">
+                                        <input
+                                          type="checkbox"
+                                          class="w-4 h-4 cursor-pointer"
+                                          title="${item.enabled ? '已启用该快捷键' : '已禁用该快捷键'}"
+                                          .checked=${item.enabled}
+                                          @change=${async (e: Event) => {
+                                            const checked = (e.target as HTMLInputElement).checked
+                                            const bridge = getDesktopBridge()
+                                            if (bridge) {
+                                              const res = await bridge.setShortcut(item.id, item.currentKey, checked)
+                                              if (res.success) {
+                                                host.desktopShortcuts = await bridge.getShortcuts()
+                                                showToast(
+                                                  `已${checked ? '启用' : '禁用'}「${item.name}」快捷键`,
+                                                  'info'
+                                                )
+                                              } else {
+                                                showToast(res.error || '设置失败', 'error')
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <button
+                                          type="button"
+                                          class="text-xs px-2.5 py-1 rounded border transition-colors cursor-pointer ${
+                                            isRecording
+                                              ? 'bg-[var(--lx-accent)] text-white border-[var(--lx-accent)]'
+                                              : 'bg-[var(--lx-main)] hover:bg-[var(--lx-hover)] border-[var(--lx-border)] text-[var(--lx-text)]'
+                                          }"
+                                          @click=${() => {
+                                            host.recordingActionId = isRecording ? null : item.id
+                                          }}
+                                        >
+                                          ${isRecording ? '取消' : '修改'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  `
+                                })}
+                              </div>
+                            </div>
+                          `
+                          : ''
+                      }
                     </div>
                   `
               }

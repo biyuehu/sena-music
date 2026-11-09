@@ -3,7 +3,7 @@ import { aliasPlugin } from './alias-plugin'
 const watching = process.argv.includes('--watch')
 
 const result = await Bun.build({
-  entrypoints: ['src/platform/desktop/main.ts'],
+  entrypoints: ['src/platform/desktop/main.ts', 'src/platform/desktop/preload.ts'],
   outdir: 'dist/desktop',
   target: 'node',
   external: ['electron'],
