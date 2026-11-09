@@ -172,20 +172,6 @@ defineComponent(
                       targetIndex = parsedIndex
                     }
                   }
-                } else if (parts.length === 2) {
-                  const [indexStr, name] = parts
-                  const parsedIndex = parseInt(indexStr, 10)
-                  targetIndex = playlist.findIndex((s) => s.name === name)
-                  if (
-                    targetIndex === -1 &&
-                    !Number.isNaN(parsedIndex) &&
-                    parsedIndex >= 0 &&
-                    parsedIndex < playlist.length
-                  ) {
-                    if (playlist[parsedIndex].name === name) {
-                      targetIndex = parsedIndex
-                    }
-                  }
                 }
 
                 if (targetIndex === -1) {

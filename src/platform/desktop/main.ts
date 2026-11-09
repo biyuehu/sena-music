@@ -29,7 +29,6 @@ export type CloseAction = 'ask' | 'tray' | 'quit'
 
 interface DesktopSettings {
   closeAction?: CloseAction
-  closeToTray?: boolean
 }
 
 function loadDesktopSettings(userData: string): DesktopSettings {
@@ -40,8 +39,6 @@ function loadDesktopSettings(userData: string): DesktopSettings {
     let closeAction: CloseAction = 'ask'
     if (parsed.closeAction === 'ask' || parsed.closeAction === 'tray' || parsed.closeAction === 'quit') {
       closeAction = parsed.closeAction
-    } else if (typeof parsed.closeToTray === 'boolean') {
-      closeAction = parsed.closeToTray ? 'tray' : 'quit'
     }
     return { closeAction }
   } catch {
@@ -57,8 +54,7 @@ function saveDesktopSettings(userData: string, settings: DesktopSettings): void 
       file,
       JSON.stringify(
         {
-          closeAction: action,
-          closeToTray: action === 'tray'
+          closeAction: action
         },
         null,
         2
@@ -231,14 +227,6 @@ function setupIpcHandlers(userData: string): void {
     closeAction = action
     saveDesktopSettings(userData, { closeAction })
     return closeAction
-  })
-
-  ipcMain.handle('desktop:get-close-to-tray', () => closeAction === 'tray')
-
-  ipcMain.handle('desktop:set-close-to-tray', (_event, enabled: boolean) => {
-    closeAction = enabled ? 'tray' : 'ask'
-    saveDesktopSettings(userData, { closeAction })
-    return closeAction === 'tray'
   })
 
   ipcMain.on(

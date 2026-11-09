@@ -54,8 +54,6 @@ export interface SenaDesktopBridge {
   resetShortcuts: () => Promise<DesktopShortcut[]>
   getCloseAction?: () => Promise<CloseAction>
   setCloseAction?: (action: CloseAction) => Promise<CloseAction>
-  getCloseToTray: () => Promise<boolean>
-  setCloseToTray: (enabled: boolean) => Promise<void>
   syncPlaybackState: (state: { isPlaying: boolean; title?: string; artist?: string }) => void
   onPlayerCommand: (callback: (command: string) => void) => () => void
   onCloseActionChanged?: (callback: (action: CloseAction) => void) => () => void

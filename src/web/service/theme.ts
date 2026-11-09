@@ -27,23 +27,12 @@ export const COLOR_SCHEMES: Record<ColorScheme, { light: string; dark: string }>
   THEME_COLORS.map((c) => [c.id, { light: c.light, dark: c.dark }])
 ) as Record<ColorScheme, { light: string; dark: string }>
 
-const LEGACY_SCHEME_MAP: Record<string, ColorScheme> = {
-  orange: 'sena',
-  blue: 'ai',
-  purple: 'hitsuji',
-  green: 'hotaru',
-  pink: 'romi'
-}
-
 export function getStoredColorScheme(): ColorScheme {
   const cached = Storage.get<string>('color-scheme')
   if (cached.isJust()) {
     const val = cached.value
     if (COLOR_SCHEMES[val as ColorScheme]) {
       return val as ColorScheme
-    }
-    if (LEGACY_SCHEME_MAP[val]) {
-      return LEGACY_SCHEME_MAP[val]
     }
   }
   return 'sena'

@@ -47,7 +47,6 @@ defineComponent(
     visualizerEnabled: State(true),
     isDesktop: State(isDesktopApp()),
     closeAction: State<CloseAction>('ask'),
-    closeToTray: State(true),
     desktopShortcuts: State<DesktopShortcut[]>(isDesktopApp() ? [...DEFAULT_DESKTOP_SHORTCUTS] : []),
     recordingActionId: State<string | null>(null)
   },
@@ -164,9 +163,6 @@ defineComponent(
           if (bridge) {
             bridge.getCloseAction?.().then((action) => {
               if (action) host.closeAction = action
-            })
-            bridge.getCloseToTray().then((val) => {
-              host.closeToTray = val
             })
             bridge.getShortcuts().then((list) => {
               if (list && list.length > 0) {

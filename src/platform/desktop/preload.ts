@@ -9,8 +9,6 @@ contextBridge.exposeInMainWorld('senaDesktop', {
   resetShortcuts: () => ipcRenderer.invoke('desktop:reset-shortcuts'),
   getCloseAction: () => ipcRenderer.invoke('desktop:get-close-action'),
   setCloseAction: (action: 'ask' | 'tray' | 'quit') => ipcRenderer.invoke('desktop:set-close-action', action),
-  getCloseToTray: () => ipcRenderer.invoke('desktop:get-close-to-tray'),
-  setCloseToTray: (enabled: boolean) => ipcRenderer.invoke('desktop:set-close-to-tray', enabled),
   syncPlaybackState: (state: { isPlaying: boolean; title?: string; artist?: string }) =>
     ipcRenderer.send('desktop:sync-playback-state', state),
   onPlayerCommand: (callback: (command: string) => void) => {
