@@ -13,7 +13,7 @@ import { PLAYLIST_SONG_ORDER_GAP } from '../../server/constant'
 import { httpClient } from '../service/client'
 import { getDesktopBridge, isDesktopApp } from '../service/desktop'
 import { AudioVisualizer } from '../service/visualizer'
-import { formatTime, getSongUrl } from '../utils'
+import { extractCoverColor, formatTime, getRandomNextIndex, getSongUrl } from '../utils'
 import {
   findActiveLyricIndex,
   getStoredLyricPreference,
@@ -100,7 +100,9 @@ defineComponent(
     }),
     currentRoute: State<AppRoute>(getAppRoute()),
     visualizer: Ref<AudioVisualizer | null>(null),
-    visualizerEnabled: State<boolean>(Storage.get<boolean>('visualizer-enabled').unwrapOr(true))
+    visualizerEnabled: State<boolean>(Storage.get<boolean>('visualizer-enabled').unwrapOr(true)),
+    coverColorBgEnabled: State<boolean>(Storage.get<boolean>('cover-color-bg-enabled').unwrapOr(true)),
+    coverColor: State<string | null>(null)
   },
   {
     useGlobalStyles: true,
@@ -116,6 +118,23 @@ defineComponent(
       `,
 
     connectedCallback: (host): (() => void) => {
+      const randomHistory: string[] = []
+      let isPlayingFromHistory = false
+      let currentCoverUrl: string | undefined
+
+      const updateCoverColor = (coverUrl?: string): void => {
+        currentCoverUrl = coverUrl
+        if (!coverUrl) {
+          host.coverColor = null
+          return
+        }
+        extractCoverColor(coverUrl).then((color) => {
+          if (currentCoverUrl === coverUrl) {
+            host.coverColor = color
+          }
+        })
+      }
+
       const savePlaybackSong = (index: number, song?: SongInfo): void => {
         if (!song) return
         Storage.set('play-song', `${index}|${song.id}|${song.name}`)
@@ -135,6 +154,9 @@ defineComponent(
           if (newIndex !== -1) {
             host.currentIndex = newIndex
             savePlaybackSong(newIndex, newPlaylist[newIndex])
+            if (newPlaylist[newIndex].cover !== currentCoverUrl) {
+              updateCoverColor(newPlaylist[newIndex].cover)
+            }
           } else {
             host.currentIndex = Math.max(-1, Math.min(host.currentIndex, newPlaylist.length - 1))
           }
@@ -232,6 +254,12 @@ defineComponent(
         }
       }
       document.addEventListener('visualizer-toggle', handleVisualizerToggle)
+
+      const handleCoverColorBgToggle = (e: Event): void => {
+        const detail = (e as CustomEvent<{ enabled: boolean }>).detail
+        host.coverColorBgEnabled = detail.enabled
+      }
+      document.addEventListener('cover-color-bg-toggle', handleCoverColorBgToggle)
 
       let isAutoMatchingBili = false
 
@@ -339,6 +367,23 @@ defineComponent(
             clearTimeout(host.playErrorTimeout)
             host.playErrorTimeout = null
           }
+
+          if (
+            !onlyLoad &&
+            !isPlayingFromHistory &&
+            host.currentIndex >= 0 &&
+            host.currentIndex !== index &&
+            host.currentIndex < host.playlist.length
+          ) {
+            const prevSong = host.playlist[host.currentIndex]
+            if (prevSong) {
+              randomHistory.push(prevSong.id)
+              if (randomHistory.length > 100) {
+                randomHistory.shift()
+              }
+            }
+          }
+          isPlayingFromHistory = false
           host.isUserManuallyPlaying = !onlyLoad
           audio.currentTime = 0
           audio.pause()
@@ -355,8 +400,9 @@ defineComponent(
             savePlaybackTime(startTime)
           }
 
-          // 异步加载三轨歌词
+          // 异步加载三轨歌词与封面颜色
           const currentSong = host.playlist[index]
+          updateCoverColor(currentSong?.cover)
           host.lyrics = []
           host.lyricStatus = 'loading'
           host.activeLyricIndex = -1
@@ -474,6 +520,7 @@ defineComponent(
         },
         next: (isAuto = false): void => {
           host.showVolumeBar = false
+          if (host.playlist.length === 0) return
           if (isAuto && host.playMode === 'stop') return
           if (!isAuto) host.isUserManuallyPlaying = true
           if (host.playMode === 'single-loop') {
@@ -482,13 +529,31 @@ defineComponent(
           }
           const nextIndex =
             host.playMode === 'random'
-              ? Math.floor(Math.random() * host.playlist.length)
+              ? getRandomNextIndex(host.playlist.length, host.currentIndex)
               : (host.currentIndex + 1) % host.playlist.length
           host.actions?.play(nextIndex)
         },
         prev: (): void => {
           host.showVolumeBar = false
+          if (host.playlist.length === 0) return
           host.isUserManuallyPlaying = true
+
+          if (host.playMode === 'random') {
+            while (randomHistory.length > 0) {
+              const prevId = randomHistory.pop()
+              if (!prevId) continue
+              const targetIndex = host.playlist.findIndex((s) => s.id === prevId)
+              if (targetIndex !== -1 && targetIndex !== host.currentIndex) {
+                isPlayingFromHistory = true
+                host.actions?.play(targetIndex)
+                return
+              }
+            }
+            const fallbackIndex = (host.currentIndex - 1 + host.playlist.length) % host.playlist.length
+            host.actions?.play(fallbackIndex)
+            return
+          }
+
           host.actions?.play((host.currentIndex - 1 + host.playlist.length) % host.playlist.length)
         },
         switchMode: (): void => {
@@ -1050,6 +1115,7 @@ defineComponent(
         window.removeEventListener('sena-desktop-ready', handleDesktopReady)
         if (unsubscribeDesktop) unsubscribeDesktop()
         document.removeEventListener('visualizer-toggle', handleVisualizerToggle)
+        document.removeEventListener('cover-color-bg-toggle', handleCoverColorBgToggle)
         if (host.visualizer) {
           host.visualizer.destroy()
           host.visualizer = null
@@ -1704,6 +1770,14 @@ defineComponent(
 
     <!-- 全屏沉浸式播放器（含多语言三轨歌词） -->
     <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
+      ${
+        host.coverColorBgEnabled && host.coverColor && song?.cover && !host.coverErrorMap[song.cover]
+          ? html`<div
+              class="absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ease-in-out"
+              style="background: radial-gradient(circle at 50% 35%, rgba(${host.coverColor}, 0.45) 0%, rgba(${host.coverColor}, 0.15) 55%, transparent 100%);"
+            ></div>`
+          : ''
+      }
       ${
         host.visualizerEnabled
           ? html`<canvas

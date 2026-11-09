@@ -1,4 +1,5 @@
 export * from './cache'
+export * from './color'
 export * from './format'
 export * from './lyric'
 export * from './router'

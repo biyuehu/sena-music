@@ -45,6 +45,7 @@ defineComponent(
     cachePath: State(''),
     cleaningCache: State(false),
     visualizerEnabled: State(true),
+    coverColorBgEnabled: State(true),
     isDesktop: State(isDesktopApp()),
     closeAction: State<CloseAction>('ask'),
     desktopShortcuts: State<DesktopShortcut[]>(isDesktopApp() ? [...DEFAULT_DESKTOP_SHORTCUTS] : []),
@@ -71,6 +72,7 @@ defineComponent(
       host.autoNextOnError = Storage.get<boolean>('auto-next-on-error').unwrapOr(true)
       host.autoMatchBiliOnError = Storage.get<boolean>('auto-match-bili-on-error').unwrapOr(true)
       host.visualizerEnabled = Storage.get<boolean>('visualizer-enabled').unwrapOr(true)
+      host.coverColorBgEnabled = Storage.get<boolean>('cover-color-bg-enabled').unwrapOr(true)
       host.colorScheme = getStoredColorScheme()
       host.theme = getStoredTheme()
 
@@ -442,6 +444,27 @@ defineComponent(
                             Storage.set('visualizer-enabled', host.visualizerEnabled)
                             document.dispatchEvent(
                               new CustomEvent('visualizer-toggle', { detail: { enabled: host.visualizerEnabled } })
+                            )
+                          }}
+                        />
+                      </label>
+
+                      <label class="flex items-center justify-between gap-3 cursor-pointer">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-xs font-bold opacity-70">全屏封面色彩背景</span>
+                          <span class="text-[11px] opacity-40">在全屏播放器背景根据当前歌曲封面主色调变换氛围色彩</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          class="w-4 h-4 cursor-pointer"
+                          .checked=${host.coverColorBgEnabled}
+                          @change=${(e: Event) => {
+                            host.coverColorBgEnabled = (e.target as HTMLInputElement).checked
+                            Storage.set('cover-color-bg-enabled', host.coverColorBgEnabled)
+                            document.dispatchEvent(
+                              new CustomEvent('cover-color-bg-toggle', {
+                                detail: { enabled: host.coverColorBgEnabled }
+                              })
                             )
                           }}
                         />
