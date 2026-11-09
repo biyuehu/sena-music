@@ -20,7 +20,7 @@ import {
   saveStoredLyricPreference
 } from '../lyric'
 import { type AppRoute, getAppRoute } from '../router'
-import { formatTime, getSongUrl } from '../utils'
+import { formatTime, getDesktopBridge, getSongUrl } from '../utils'
 import { AudioVisualizer } from '../visualizer'
 import { showToast } from './toast'
 
@@ -115,6 +115,33 @@ defineComponent(
       `,
 
     connectedCallback: (host): (() => void) => {
+      const LONG_CACHE_TTL = 86400 * 365
+
+      const savePlaybackSong = (index: number, song?: SongInfo): void => {
+        if (!song) return
+        Cache.set('play-song', `${index}|${song.id}|${song.name}`, LONG_CACHE_TTL)
+      }
+
+      const savePlaybackTime = (time: number): void => {
+        Cache.set('play-time', Math.floor(time * 10) / 10, LONG_CACHE_TTL)
+      }
+
+      const updatePlaylistPreservingCurrent = (newPlaylist: Playlist): void => {
+        const currentSong =
+          host.currentIndex >= 0 && host.currentIndex < host.playlist.length ? host.playlist[host.currentIndex] : null
+        host.playlist = newPlaylist
+
+        if (currentSong) {
+          const newIndex = newPlaylist.findIndex((s) => s.id === currentSong.id)
+          if (newIndex !== -1) {
+            host.currentIndex = newIndex
+            savePlaybackSong(newIndex, newPlaylist[newIndex])
+          } else {
+            host.currentIndex = Math.max(-1, Math.min(host.currentIndex, newPlaylist.length - 1))
+          }
+        }
+      }
+
       const loadPlaylist = (): void => {
         httpClient
           .getPlaylist()
@@ -125,15 +152,52 @@ defineComponent(
                 host.playlistError = Nothing()
                 const lastPlayCache = Cache.get<string>('play-song')
                 if (lastPlayCache.isNothing()) return
-                const [indexStr, name] = lastPlayCache.value.split('|')
-                const index = parseInt(indexStr, 10)
-                if (Number.isNaN(index) || index < 0 || index >= playlist.length || playlist[index].name !== name) {
+                const raw = lastPlayCache.value
+                let targetIndex = -1
+                const parts = raw.split('|')
+
+                if (parts.length >= 3) {
+                  const [indexStr, cachedId, cachedName] = parts
+                  const parsedIndex = parseInt(indexStr, 10)
+                  targetIndex = playlist.findIndex((s) => s.id === cachedId)
+                  if (targetIndex === -1 && cachedName) {
+                    targetIndex = playlist.findIndex((s) => s.name === cachedName)
+                  }
+                  if (
+                    targetIndex === -1 &&
+                    !Number.isNaN(parsedIndex) &&
+                    parsedIndex >= 0 &&
+                    parsedIndex < playlist.length
+                  ) {
+                    if (playlist[parsedIndex].name === cachedName) {
+                      targetIndex = parsedIndex
+                    }
+                  }
+                } else if (parts.length === 2) {
+                  const [indexStr, name] = parts
+                  const parsedIndex = parseInt(indexStr, 10)
+                  targetIndex = playlist.findIndex((s) => s.name === name)
+                  if (
+                    targetIndex === -1 &&
+                    !Number.isNaN(parsedIndex) &&
+                    parsedIndex >= 0 &&
+                    parsedIndex < playlist.length
+                  ) {
+                    if (playlist[parsedIndex].name === name) {
+                      targetIndex = parsedIndex
+                    }
+                  }
+                }
+
+                if (targetIndex === -1) {
                   Cache.remove('play-song')
                   Cache.remove('play-time')
                   return
                 }
+
                 const savedTime = Math.max(0, Cache.get<number>('play-time').unwrapOr(0))
-                host.actions?.play(index, true, savedTime)
+                savePlaybackSong(targetIndex, playlist[targetIndex])
+                host.actions?.play(targetIndex, true, savedTime)
               },
               Left: ({ error }) => {
                 console.error('Failed to load playlist:', error)
@@ -186,11 +250,53 @@ defineComponent(
 
       let isAutoMatchingBili = false
 
+      const updateMediaSession = (song?: SongInfo, isPlaying = false): void => {
+        if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+          if (song) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: song.name,
+              artist: song.artists.join(' / '),
+              album: 'Sena Music',
+              artwork: song.cover ? [{ src: song.cover, sizes: '512x512', type: 'image/jpeg' }] : []
+            })
+          }
+          navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+        }
+
+        const bridge = getDesktopBridge()
+        if (bridge) {
+          bridge.syncPlaybackState({
+            isPlaying,
+            title: song?.name,
+            artist: song?.artists?.join(' / ')
+          })
+        }
+      }
+
+      const syncMediaPosition = (): void => {
+        if (
+          typeof navigator !== 'undefined' &&
+          'mediaSession' in navigator &&
+          'setPositionState' in navigator.mediaSession &&
+          !Number.isNaN(audio.duration) &&
+          audio.duration > 0
+        ) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: audio.duration,
+              playbackRate: audio.playbackRate || 1,
+              position: Math.min(audio.currentTime, audio.duration)
+            })
+          } catch {}
+        }
+      }
+
       const fallbackNext = (index: number, error?: string): void => {
         const autoNextEnabled = Cache.get<boolean>('auto-next-on-error').unwrapOr(true)
         const shouldAutoNext =
           autoNextEnabled && host.isUserManuallyPlaying && host.playMode !== 'stop' && host.playMode !== 'single-loop'
         host.isPlaying = false
+        updateMediaSession(host.playlist[index], false)
         if (host.visualizer) host.visualizer.setPlaying(false)
         if (host.playErrorTimeout !== null) clearTimeout(host.playErrorTimeout)
         if (error) console.error(`Failed to play song ${index}:`, error)
@@ -221,11 +327,11 @@ defineComponent(
             const result = await httpClient.autoMatchBiliSong({ songId: currentSong.id })
             if (result.isRight()) {
               const { matched, playlist } = result.value
-              host.playlist = playlist
+              updatePlaylistPreservingCurrent(playlist)
               showToast(`已自动匹配并绑定 B站音源：${matched.title}`, 'success')
               isAutoMatchingBili = false
-              if (host.currentIndex === index) {
-                host.actions?.play(index)
+              if (host.currentIndex !== -1) {
+                host.actions?.play(host.currentIndex)
               }
               return
             }
@@ -256,8 +362,12 @@ defineComponent(
           host.currentTime = startTime > 0 ? formatTime(startTime) : '00:00'
           host.duration = '00:00'
 
+          savePlaybackSong(index, host.playlist[index])
+
           if (startTime <= 0) {
-            Cache.set('play-time', 0)
+            savePlaybackTime(0)
+          } else {
+            savePlaybackTime(startTime)
           }
 
           // 异步加载三轨歌词
@@ -326,17 +436,22 @@ defineComponent(
               audio.addEventListener('loadedmetadata', applyStartTime, { once: true })
               audio.addEventListener('canplay', applyStartTime, { once: true })
             }
-            if (onlyLoad) return
+            if (onlyLoad) {
+              updateMediaSession(host.playlist[index], false)
+              return
+            }
             await audio.play()
             host.isPlaying = true
             if (host.visualizer) host.visualizer.setPlaying(true)
-            Cache.set('play-song', `${host.currentIndex}|${host.playlist[host.currentIndex].name}`)
+            savePlaybackSong(host.currentIndex, host.playlist[host.currentIndex])
+            updateMediaSession(host.playlist[index], true)
           } catch (err) {
             if ((err as { name?: string })?.name === 'AbortError') {
               return
             }
             if ((err as { name?: string })?.name === 'NotAllowedError') {
               host.isPlaying = false
+              updateMediaSession(host.playlist[index], false)
               return
             }
             console.error('Play failed:', err)
@@ -351,6 +466,7 @@ defineComponent(
             host.playErrorTimeout = null
             host.isUserManuallyPlaying = false
             host.isPlaying = false
+            updateMediaSession(host.playlist[host.currentIndex], false)
             return
           }
           if (host.isPlaying) {
@@ -358,6 +474,7 @@ defineComponent(
             audio.pause()
             host.isPlaying = false
             if (host.visualizer) host.visualizer.setPlaying(false)
+            updateMediaSession(host.playlist[host.currentIndex], false)
           } else {
             host.isUserManuallyPlaying = true
             audio
@@ -365,6 +482,7 @@ defineComponent(
               .then(() => {
                 host.isPlaying = true
                 if (host.visualizer) host.visualizer.setPlaying(true)
+                updateMediaSession(host.playlist[host.currentIndex], true)
               })
               .catch(() => handlePlayError(host.currentIndex))
           }
@@ -392,7 +510,7 @@ defineComponent(
           host.showVolumeBar = false
           const modes: PlayMode[] = ['list-loop', 'random', 'single-loop', 'stop']
           host.playMode = modes[(modes.indexOf(host.playMode) + 1) % modes.length]
-          Cache.set('play-mode', host.playMode)
+          Cache.set('play-mode', host.playMode, LONG_CACHE_TTL)
         },
         seekToRatio: (ratio: number, previewOnly = false): void => {
           host.showVolumeBar = false
@@ -403,7 +521,7 @@ defineComponent(
             host.currentTime = formatTime(targetTime)
             if (!previewOnly) {
               audio.currentTime = targetTime
-              Cache.set('play-time', Math.floor(targetTime * 10) / 10)
+              savePlaybackTime(targetTime)
               host.isUserScrollingLyrics = false
               if (host.lyrics.length > 0) {
                 host.activeLyricIndex = findActiveLyricIndex(host.lyrics, targetTime)
@@ -421,7 +539,7 @@ defineComponent(
         setVolume: (val: number): void => {
           if (val > 0) lastVolume = val
           audio.volume = host.volume = val
-          Cache.set('play-volume', val)
+          Cache.set('play-volume', val, LONG_CACHE_TTL)
         },
         toggleFullscreen: (): void => {
           host.showVolumeBar = false
@@ -448,7 +566,7 @@ defineComponent(
             .then((res) =>
               res.match({
                 Right: ({ playlist }) => {
-                  host.playlist = playlist
+                  updatePlaylistPreservingCurrent(playlist)
                   showToast('同步成功', 'success')
                 },
                 Left: ({ error }) => {
@@ -468,7 +586,7 @@ defineComponent(
           httpClient.setSongOrder({ id, order: newIndex }).then((res) =>
             res.match({
               Right: ({ playlist }) => {
-                host.playlist = playlist
+                updatePlaylistPreservingCurrent(playlist)
               },
               Left: ({ error }) => {
                 console.error('Failed to set song order:', error)
@@ -486,7 +604,7 @@ defineComponent(
           httpClient.removeSong({ id }).then((res) =>
             res.match({
               Right: ({ playlist }) => {
-                host.playlist = playlist
+                updatePlaylistPreservingCurrent(playlist)
               },
               Left: ({ error }) => {
                 console.error('Failed to remove song:', error)
@@ -497,7 +615,7 @@ defineComponent(
         },
         seekToTime: (time: number, autoPlay = true): void => {
           audio.currentTime = time
-          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
+          savePlaybackTime(audio.currentTime)
           host.isUserScrollingLyrics = false
           if (!Number.isNaN(audio.duration) && audio.duration > 0) {
             host.progress = (time / audio.duration) * 100
@@ -574,7 +692,7 @@ defineComponent(
       const savePlaybackProgress = (time: number): void => {
         if (Math.abs(time - lastSavedProgressTime) >= 1) {
           lastSavedProgressTime = time
-          Cache.set('play-time', Math.floor(time * 10) / 10)
+          savePlaybackTime(time)
         }
       }
 
@@ -585,6 +703,7 @@ defineComponent(
             host.progress = (audio.currentTime / audio.duration) * 100 || 0
             host.currentTime = formatTime(audio.currentTime)
           }
+          syncMediaPosition()
         }
       }
 
@@ -594,6 +713,7 @@ defineComponent(
           host.currentTime = formatTime(audio.currentTime)
           host.duration = formatTime(audio.duration)
           savePlaybackProgress(audio.currentTime)
+          syncMediaPosition()
         }
 
         if (host.lyrics.length > 0) {
@@ -609,11 +729,12 @@ defineComponent(
       audio.onpause = (): void => {
         if (host.visualizer) host.visualizer.setPlaying(false)
         if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
-          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
+          savePlaybackTime(audio.currentTime)
         }
+        updateMediaSession(host.playlist[host.currentIndex], false)
       }
       audio.onended = (): void => {
-        Cache.set('play-time', 0)
+        savePlaybackTime(0)
         if (host.playMode === 'single-loop') {
           audio.currentTime = 0
           audio.play()
@@ -630,7 +751,7 @@ defineComponent(
           .then((r) =>
             r.match({
               Right: ({ playlist }) => {
-                host.playlist = playlist
+                updatePlaylistPreservingCurrent(playlist)
                 showToast('添加成功', 'success')
               },
               Left: ({ error }) => {
@@ -656,7 +777,7 @@ defineComponent(
           .then((r) =>
             r.match({
               Right: ({ playlist }) => {
-                host.playlist = playlist
+                updatePlaylistPreservingCurrent(playlist)
                 showToast('更新成功', 'success')
                 if (host.playlist[host.currentIndex]?.id === e.detail.id) {
                   audio.src = ''
@@ -849,7 +970,7 @@ defineComponent(
       window.addEventListener('popstate', handleRouteChange)
       const handleBeforeUnload = (): void => {
         if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
-          Cache.set('play-time', Math.floor(audio.currentTime * 10) / 10)
+          savePlaybackTime(audio.currentTime)
         }
       }
 
@@ -864,7 +985,58 @@ defineComponent(
       if (volume.isJust()) host.actions.setVolume(volume.value)
       if (mode.isJust()) host.playMode = mode.value
 
+      if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.setActionHandler('play', () => host.actions?.toggle())
+          navigator.mediaSession.setActionHandler('pause', () => host.actions?.toggle())
+          navigator.mediaSession.setActionHandler('previoustrack', () => host.actions?.prev())
+          navigator.mediaSession.setActionHandler('nexttrack', () => host.actions?.next())
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime != null) host.actions?.seek(details.seekTime)
+          })
+          navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+            const offset = details.seekOffset || 5
+            if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+              host.actions?.seek(Math.max(0, audio.currentTime - offset))
+            }
+          })
+          navigator.mediaSession.setActionHandler('seekforward', (details) => {
+            const offset = details.seekOffset || 5
+            if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+              host.actions?.seek(Math.min(audio.duration, audio.currentTime + offset))
+            }
+          })
+        } catch (err) {
+          console.warn('Failed to bind MediaSession action handlers:', err)
+        }
+      }
+
+      const desktopBridge = getDesktopBridge()
+      let unsubscribeDesktop: (() => void) | undefined
+      if (desktopBridge) {
+        unsubscribeDesktop = desktopBridge.onPlayerCommand((command) => {
+          switch (command) {
+            case 'toggle':
+              host.actions?.toggle()
+              break
+            case 'prev':
+              host.actions?.prev()
+              break
+            case 'next':
+              host.actions?.next()
+              break
+            case 'volumeUp':
+              host.actions?.setVolume(Math.min(1, Math.round((host.volume + 0.05) * 100) / 100))
+              break
+            case 'volumeDown':
+              host.actions?.setVolume(Math.max(0, Math.round((host.volume - 0.05) * 100) / 100))
+              break
+          }
+        })
+      }
+
       return (): void => {
+        if (unsubscribeDesktop) unsubscribeDesktop()
         document.removeEventListener('visualizer-toggle', handleVisualizerToggle)
         if (host.visualizer) {
           host.visualizer.destroy()

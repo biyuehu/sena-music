@@ -10,7 +10,7 @@ export namespace Cache {
     return `sena-cache:${key}`
   }
 
-  export function set<T extends Value>(key: string, value: T, seconds: number = 3600): void {
+  export function set<T extends Value>(key: string, value: T, seconds: number = 86400 * 365): void {
     localStorage.setItem(genKey(key), JSON.stringify({ time: Date.now() + seconds * 1000, value }))
   }
 
