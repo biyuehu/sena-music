@@ -856,24 +856,24 @@ defineComponent(
           return
         }
 
-        // 上一首：[ 或 Ctrl/Alt/Meta + 方向左 或 媒体上一首
+        // 上一首：[ 或 媒体上一首，网页模式下额外支持 Ctrl/Alt/Meta + 方向左
         if (
           e.code === 'BracketLeft' ||
           e.code === 'MediaTrackPrevious' ||
           e.key === 'MediaTrackPrevious' ||
-          ((e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowLeft')
+          (!isDesktopApp() && (e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowLeft')
         ) {
           e.preventDefault()
           host.actions?.prev()
           return
         }
 
-        // 下一首：] 或 Ctrl/Alt/Meta + 方向右 或 媒体下一首
+        // 下一首：] 或 媒体下一首，网页模式下额外支持 Ctrl/Alt/Meta + 方向右
         if (
           e.code === 'BracketRight' ||
           e.code === 'MediaTrackNext' ||
           e.key === 'MediaTrackNext' ||
-          ((e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowRight')
+          (!isDesktopApp() && (e.ctrlKey || e.altKey || e.metaKey) && e.code === 'ArrowRight')
         ) {
           e.preventDefault()
           host.actions?.next()
@@ -1599,9 +1599,9 @@ defineComponent(
       return html`
   <div class="flex h-[100dvh] max-h-[100dvh] bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
     <main class="flex-1 flex flex-col min-w-0 min-h-0 relative order-1 md:order-2">
-      <settings-page class="${host.currentRoute === 'settings' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></settings-page>
-      <about-page class="${host.currentRoute === 'about' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></about-page>
-      <div class="${host.currentRoute === 'playlist' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}">
+      <settings-page ?hidden=${host.currentRoute !== 'settings'} class="${host.currentRoute === 'settings' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></settings-page>
+      <about-page ?hidden=${host.currentRoute !== 'about'} class="${host.currentRoute === 'about' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}"></about-page>
+      <div ?hidden=${host.currentRoute !== 'playlist'} class="${host.currentRoute === 'playlist' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'hidden'}">
         <div class="flex-none flex flex-wrap items-center justify-end gap-4 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
         <div class="relative flex-1 max-w-sm min-w-[200px] hidden xl:block mr-auto">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--lx-text-muted)]">

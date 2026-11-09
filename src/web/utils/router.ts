@@ -10,5 +10,6 @@ export function getAppRoute(): AppRoute {
 
 export function navigateTo(route: AppRoute): void {
   if (typeof window === 'undefined') return
+  if (getAppRoute() === route) return
   window.location.hash = `#/${route}`
 }

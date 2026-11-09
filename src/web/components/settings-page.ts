@@ -60,6 +60,10 @@ defineComponent(
         min-width: 0;
         width: 100%;
       }
+      :host([hidden]),
+      :host(.hidden) {
+        display: none !important;
+      }
     `,
     connectedCallback: (host): (() => void) => {
       initTheme()
@@ -108,7 +112,13 @@ defineComponent(
           host.loading = false
         })
 
-      const loadCacheInfo = (): void => {
+      let lastCacheInfoTime = 0
+      const loadCacheInfo = (force = false): void => {
+        const now = Date.now()
+        if (!force && host.cacheSize > 0 && now - lastCacheInfoTime < 30000) {
+          return
+        }
+        lastCacheInfoTime = now
         httpClient.getCacheInfo().then((result) =>
           result.match({
             Right: (info) => {

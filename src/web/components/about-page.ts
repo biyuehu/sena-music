@@ -17,6 +17,10 @@ export const AboutPage = defineComponent(
         min-width: 0;
         width: 100%;
       }
+      :host([hidden]),
+      :host(.hidden) {
+        display: none !important;
+      }
       kbd {
         display: inline-flex;
         align-items: center;
@@ -56,7 +60,8 @@ export const AboutPage = defineComponent(
             { keys: ['↑'], desc: '音量增加 5%', note: '音量步进调节' },
             { keys: ['↓'], desc: '音量减少 5%', note: '音量步退调节' },
             { keys: ['M'], desc: '静音 / 恢复音量', note: '记录原音量，再次按下恢复' },
-            { keys: ['F'], desc: '全屏歌词界面', note: '切换全屏歌词与动态光影可视化' }
+            { keys: ['F'], desc: '全屏歌词界面', note: '切换全屏歌词与动态光影可视化' },
+            { keys: ['F11'], desc: '应用全屏', note: '进入或退出全屏模式' }
           ]
         },
         {

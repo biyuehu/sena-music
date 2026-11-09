@@ -1,6 +1,5 @@
 import { html } from 'lit-html'
 import { defineComponent, State } from '@/romi/web'
-import packageJson from '../../../package.json'
 import { getEffectiveTheme, initTheme } from '../service/theme'
 import { type AppRoute, getAppRoute, navigateTo } from '../utils/router'
 
@@ -100,7 +99,7 @@ export const sideNav = defineComponent(
         <div class="flex-1 px-2 space-y-1">
           <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'playlist' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
                @click=${() => {
-                 navigateTo('playlist')
+                 if (host.activeRoute !== 'playlist') navigateTo('playlist')
                  host.isDrawerOpen = false
                }}>
             <div class="i-carbon-list shrink-0"></div>
@@ -108,7 +107,7 @@ export const sideNav = defineComponent(
           </div>
           <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'settings' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
                @click=${() => {
-                 navigateTo('settings')
+                 if (host.activeRoute !== 'settings') navigateTo('settings')
                  host.isDrawerOpen = false
                }}>
             <div class="i-carbon-settings shrink-0"></div>
@@ -116,24 +115,12 @@ export const sideNav = defineComponent(
           </div>
           <div class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer ${host.activeRoute === 'about' ? 'bg-[var(--lx-accent)] text-white' : 'opacity-60 hover:opacity-100 hover:bg-[var(--lx-hover)]'}"
                @click=${() => {
-                 navigateTo('about')
+                 if (host.activeRoute !== 'about') navigateTo('about')
                  host.isDrawerOpen = false
                }}>
             <div class="i-carbon-information shrink-0"></div>
             <span>关于</span>
           </div>
-        </div>
-
-        <div class="p-3 border-t border-[var(--lx-border)]">
-          <a
-            href="https://github.com/biyuehu/sena-music"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-3 px-3 py-2 rounded text-sm cursor-pointer w-full opacity-80 hover:opacity-100 hover:bg-[var(--lx-hover)] transition-colors text-[var(--lx-text)]"
-          >
-            <div class="i-carbon-logo-github text-base shrink-0"></div>
-            <span class="text-xs font-medium">v${packageJson.version}</span>
-          </a>
         </div>
       </nav>
     `
