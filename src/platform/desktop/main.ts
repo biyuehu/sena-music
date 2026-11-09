@@ -412,8 +412,9 @@ async function createWindow(): Promise<BrowserWindow> {
 
   try {
     const { CONFIG } = await import('../../server/config')
-    await import('../../server/app')
-    await window.loadURL(`http://localhost:${CONFIG.port}`)
+    const { bootstrap } = await import('../../server/app')
+    const { port } = await bootstrap(CONFIG.port)
+    await window.loadURL(`http://localhost:${port}`)
   } catch (error) {
     console.error('Failed to start:', error)
     await window.loadURL(`data:text/html,${encodeURIComponent(`<pre>${String(error)}</pre>`)}`)
