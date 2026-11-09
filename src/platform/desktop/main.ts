@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, Tray } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { APP_ICON_DATA_URL, TRAY_ICON_DATA_URL } from './assets'
 import {
   checkShortcutConflict,
@@ -9,7 +9,8 @@ import {
   loadShortcuts,
   registerAllShortcuts,
   type ShortcutItem,
-  saveShortcuts
+  saveShortcuts,
+  unregisterShortcutKey
 } from './shortcuts'
 
 function preparePackagedEnvironment(): void {
@@ -178,10 +179,35 @@ function setupIpcHandlers(userData: string): void {
   ipcMain.handle(
     'desktop:set-shortcut',
     (_event, { id, key, enabled }: { id: string; key: string; enabled: boolean }) => {
-      const check = checkShortcutConflict(id, key, currentShortcuts)
-      if (!check.success) return check
+      const cleanKey = (key || '').trim()
+      const oldItem = currentShortcuts.find((s) => s.id === id)
 
-      currentShortcuts = currentShortcuts.map((s) => (s.id === id ? { ...s, currentKey: key.trim(), enabled } : s))
+      // If clearing or disabling, unregister old shortcut immediately
+      if (!enabled || !cleanKey) {
+        if (oldItem?.currentKey) {
+          unregisterShortcutKey(oldItem.currentKey)
+        }
+        currentShortcuts = currentShortcuts.map((s) =>
+          s.id === id ? { ...s, currentKey: cleanKey, enabled: false } : s
+        )
+        saveShortcuts(userData, currentShortcuts)
+        registerAllShortcuts(mainWindow, currentShortcuts)
+        return { success: true }
+      }
+
+      // Explicitly unregister old key before conflict check and updating
+      if (oldItem?.currentKey && oldItem.currentKey.toLowerCase() !== cleanKey.toLowerCase()) {
+        unregisterShortcutKey(oldItem.currentKey)
+      }
+
+      const check = checkShortcutConflict(id, cleanKey, currentShortcuts)
+      if (!check.success) {
+        // Restore registrations if conflict check failed
+        registerAllShortcuts(mainWindow, currentShortcuts)
+        return check
+      }
+
+      currentShortcuts = currentShortcuts.map((s) => (s.id === id ? { ...s, currentKey: cleanKey, enabled } : s))
       saveShortcuts(userData, currentShortcuts)
       registerAllShortcuts(mainWindow, currentShortcuts)
       return { success: true }
@@ -189,6 +215,12 @@ function setupIpcHandlers(userData: string): void {
   )
 
   ipcMain.handle('desktop:reset-shortcuts', () => {
+    // Unregister all existing shortcut keys first
+    for (const item of currentShortcuts) {
+      if (item.currentKey) {
+        unregisterShortcutKey(item.currentKey)
+      }
+    }
     currentShortcuts = DEFAULT_SHORTCUTS.map((s) => ({ ...s }))
     saveShortcuts(userData, currentShortcuts)
     registerAllShortcuts(mainWindow, currentShortcuts)
@@ -277,21 +309,49 @@ async function createWindow(): Promise<BrowserWindow> {
   window.setMenu(null)
   window.once('ready-to-show', () => window.show())
 
-  if (isDev) {
-    window.webContents.on('before-input-event', (event, input) => {
-      if (
-        input.type === 'keyDown' &&
-        (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'))
-      ) {
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      window.setFullScreen(!window.isFullScreen())
+      event.preventDefault()
+      return
+    }
+
+    if (isDev && input.type === 'keyDown') {
+      if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
         window.webContents.toggleDevTools()
         event.preventDefault()
       }
-    })
-  } else {
+    }
+  })
+
+  if (!isDev) {
     window.webContents.on('devtools-opened', () => {
       window.webContents.closeDevTools()
     })
   }
+
+  // Intercept window.open and <a target="_blank"> to open in default system browser
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:') || url.startsWith('mailto:')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  // Prevent renderer from navigating away to external websites within the electron window
+  window.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const parsed = new URL(navigationUrl)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        if (!parsed.hostname.includes('localhost') && !parsed.hostname.includes('127.0.0.1')) {
+          event.preventDefault()
+          shell.openExternal(navigationUrl)
+        }
+      }
+    } catch {
+      // ignore invalid URLs
+    }
+  })
 
   window.on('close', async (event) => {
     if (isQuitting) return

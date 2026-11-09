@@ -120,20 +120,50 @@ export function checkShortcutConflict(
   return { success: true }
 }
 
-export function registerAllShortcuts(mainWindow: BrowserWindow | undefined, shortcuts: ShortcutItem[]): void {
-  globalShortcut.unregisterAll()
+const registeredKeys = new Set<string>()
 
+export function unregisterShortcutKey(key: string): void {
+  const clean = key.trim()
+  if (!clean) return
+  try {
+    if (globalShortcut.isRegistered(clean)) {
+      globalShortcut.unregister(clean)
+    }
+  } catch (err) {
+    console.warn(`Failed to unregister key ${clean}:`, err)
+  }
+  registeredKeys.delete(clean)
+}
+
+export function registerAllShortcuts(mainWindow: BrowserWindow | undefined, shortcuts: ShortcutItem[]): void {
+  // 1. Explicitly unregister all previously registered keys individually
+  for (const key of registeredKeys) {
+    try {
+      globalShortcut.unregister(key)
+    } catch {}
+  }
+  registeredKeys.clear()
+
+  // 2. Also unregisterAll to ensure no orphan shortcuts remain
+  try {
+    globalShortcut.unregisterAll()
+  } catch {}
+
+  // 3. Register currently active shortcuts
   for (const item of shortcuts) {
-    if (!item.enabled || !item.currentKey.trim()) continue
+    const key = item.currentKey.trim()
+    if (!item.enabled || !key) continue
 
     try {
-      const ok = globalShortcut.register(item.currentKey.trim(), () => {
+      const ok = globalShortcut.register(key, () => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('player-command', item.id)
         }
       })
-      if (!ok) {
-        console.warn(`Failed to register global shortcut for ${item.id}: ${item.currentKey}`)
+      if (ok) {
+        registeredKeys.add(key)
+      } else {
+        console.warn(`Failed to register global shortcut for ${item.id}: ${key}`)
       }
     } catch (err) {
       console.warn(`Error registering global shortcut for ${item.id}:`, err)
