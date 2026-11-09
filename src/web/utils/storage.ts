@@ -1,6 +1,5 @@
 import z from 'zod'
 import { Just, type Maybe, Nothing } from '@/romi/utils/adt/maybe'
-import { Cache } from './cache'
 
 export namespace Storage {
   const schema = z.union([z.string(), z.number(), z.boolean()])
@@ -30,14 +29,6 @@ export namespace Storage {
         }
       } catch {}
       remove(key)
-    }
-
-    // Migration fallback from Cache
-    const legacy = Cache.get<T>(key)
-    if (legacy.isJust()) {
-      set(key, legacy.value)
-      Cache.remove(key)
-      return legacy
     }
 
     return Nothing()

@@ -64,24 +64,6 @@ describe('Storage & Cache Architecture', () => {
     expect(val2).toBe('fallback-value')
   })
 
-  it('Storage should migrate legacy entries from Cache', () => {
-    // Put entry in legacy Cache format
-    Cache.set('legacy-setting', 'legacy-value', 3600)
-    expect(localStorage.getItem('sena-cache:legacy-setting')).not.toBeNull()
-    expect(localStorage.getItem('sena-storage:legacy-setting')).toBeNull()
-
-    // Access via Storage.get
-    const migrated = Storage.get<string>('legacy-setting')
-    expect(migrated.isJust()).toBe(true)
-    if (migrated.isJust()) {
-      expect(migrated.value).toBe('legacy-value')
-    }
-
-    // Legacy cache entry should be removed and storage entry populated
-    expect(localStorage.getItem('sena-cache:legacy-setting')).toBeNull()
-    expect(localStorage.getItem('sena-storage:legacy-setting')).toBe(JSON.stringify('legacy-value'))
-  })
-
   it('Cache should expire after TTL', () => {
     // Put item with negative TTL (already expired)
     Cache.set('expired-key', 'old-val', -10)
