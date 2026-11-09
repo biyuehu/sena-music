@@ -17,7 +17,11 @@ export async function getSongUrl(song: SongInfo): Promise<Either<string, string>
     case 'local':
       return Right(`/getLocalAudioFiles?id=${song.id}`)
     case 'bili':
-      return Right(`/getBiliAudioFile?id=${song.id}`)
+      return Right(
+        song.value
+          ? `/getBiliAudioFile?id=${encodeURIComponent(song.id)}&v=${encodeURIComponent(song.value)}`
+          : `/getBiliAudioFile?id=${encodeURIComponent(song.id)}`
+      )
     case 'youtube':
       return Right(`/getYoutubeAudioFile?id=${song.id}`)
     case 'qq':

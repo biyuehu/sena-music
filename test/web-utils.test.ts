@@ -62,6 +62,13 @@ describe('Web Utils', () => {
       expect(res.unwrap()).toBe('/getBiliAudioFile?id=bili-song-1')
     })
 
+    it('should resolve bili song endpoint with bv value', async () => {
+      const song: SongInfo = { ...baseSong, type: 'bili', id: 'bili-song-1', value: 'BV14Gg46LEMh' }
+      const res = await getSongUrl(song)
+      expect(res.isRight()).toBe(true)
+      expect(res.unwrap()).toBe('/getBiliAudioFile?id=bili-song-1&v=BV14Gg46LEMh')
+    })
+
     it('should resolve youtube song endpoint', async () => {
       const song: SongInfo = { ...baseSong, type: 'youtube', id: 'yt-song-1' }
       const res = await getSongUrl(song)

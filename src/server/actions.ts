@@ -43,8 +43,16 @@ export const setSongSourceHandler = Action.empty<AppState>()
       })
     )
   ] as const)
-  .bind(async ([{ id, source, value, lyricConfig }], { logger }) =>
-    Data.load().match({
+  .bind(async ([{ id, source, value, lyricConfig }], { logger }) => {
+    if (source === 'bili' && value.trim()) {
+      logger.info(`Pre-caching Bilibili audio for song ${id} (${value}) ...`)
+      const audioResult = await BiliFetcher.getAudioFilePath(value.trim())
+      if (audioResult.isNothing()) {
+        logger.warn(`Failed to pre-cache Bilibili audio for song ${id} (${value}), continuing to save`)
+      }
+    }
+
+    return Data.load().match({
       Right: (playlist) => {
         const songIndex = playlist.findIndex((song) => song.id === id)
 
@@ -73,7 +81,7 @@ export const setSongSourceHandler = Action.empty<AppState>()
         return Left({ error: `Failed to load playlist: ${stringifyCatchError(err)}` })
       }
     })
-  )
+  })
 
 export const addSongHandler = Action.empty<AppState>()
   .use([
@@ -391,8 +399,8 @@ export const getYoutubeAudioFileHandler = Action.empty<AppState>()
   })
 
 export const getBiliAudioFileHandler = Action.empty<AppState>()
-  .use([new QueryExtracter(z.object({ id: z.string() }))] as const)
-  .bind(async ([{ id }], { logger }) => {
+  .use([new QueryExtracter(z.object({ id: z.string(), v: z.string().optional() }))] as const)
+  .bind(async ([{ id, v }], { logger }) => {
     const data = Data.load().map((playlist) => playlist.find((song) => song.id === id))
     if (data.isLeft()) {
       logger.error('Failed to load playlist:', data.value)
@@ -411,20 +419,21 @@ export const getBiliAudioFileHandler = Action.empty<AppState>()
       })
     }
 
-    if (data.value.type !== 'bili' || !data.value.value.trim()) {
-      logger.warn(`Song with id ${id} is not a Bilibili source`)
+    const bvid = (v || data.value.value || '').trim()
+    if (!bvid) {
+      logger.warn(`Song with id ${id} does not have a Bilibili BV ID`)
       return Left({
         type: 'application/json',
-        content: JSON.stringify({ error: `Song with id ${id} is not a Bilibili source` }),
+        content: JSON.stringify({ error: `Song with id ${id} does not have a Bilibili BV ID` }),
         code: 400
       })
     }
 
-    logger.info(`Getting Bilibili audio for song "${data.value.name}" (id: ${id}, value: "${data.value.value}") ...`)
+    logger.info(`Getting Bilibili audio for song "${data.value.name}" (id: ${id}, value: "${bvid}") ...`)
 
-    const audioFilePathResult = await BiliFetcher.getAudioFilePath(data.value.value)
+    const audioFilePathResult = await BiliFetcher.getAudioFilePath(bvid)
     if (audioFilePathResult.isNothing()) {
-      logger.error(`Failed to get Bilibili audio file for song ${id}`)
+      logger.error(`Failed to get Bilibili audio file for song ${id} (${bvid})`)
       return Left({
         type: 'application/json',
         content: JSON.stringify({ error: 'Failed to get Bilibili audio file' }),
@@ -436,7 +445,8 @@ export const getBiliAudioFileHandler = Action.empty<AppState>()
       type: 'audio/mpeg',
       path: audioFilePathResult.value,
       headers: {
-        'Accept-Ranges': 'bytes'
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-cache, must-revalidate'
       }
     })
   })
@@ -582,29 +592,27 @@ export const autoMatchBiliSongHandler = Action.empty<AppState>()
     }
 
     const matchRes = await BiliFetcher.matchBestVideo(targetSong.name, targetSong.artists)
-    return matchRes.match({
-      Just: ({ best, score }) => {
-        logger.info(
-          `Auto-matched song "${targetSong.name}" to Bilibili ${best.bvid} (${best.title}) with score ${score}`
-        )
-        const updatedPlaylist = playlist.map((s) =>
-          s.id === songId ? { ...s, type: 'bili' as const, value: best.bvid } : s
-        )
-        try {
-          Data.save(updatedPlaylist)
-          return Right({
-            matched: best,
-            score,
-            playlist: updatedPlaylist
-          })
-        } catch (err) {
-          logger.error('Failed to save playlist after auto-matching Bilibili:', err)
-          return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
-        }
-      },
-      Nothing: () => {
-        logger.warn(`No suitable Bilibili match found for song "${targetSong.name}"`)
-        return Left({ error: `No suitable Bilibili match found for song "${targetSong.name}"` })
-      }
-    })
+    if (matchRes.isNothing()) {
+      logger.warn(`No suitable Bilibili match found for song "${targetSong.name}"`)
+      return Left({ error: `No suitable Bilibili match found for song "${targetSong.name}"` })
+    }
+
+    const { best, score } = matchRes.value
+    logger.info(`Auto-matched song "${targetSong.name}" to Bilibili ${best.bvid} (${best.title}) with score ${score}`)
+    const updatedPlaylist = playlist.map((s) =>
+      s.id === songId ? { ...s, type: 'bili' as const, value: best.bvid } : s
+    )
+    try {
+      Data.save(updatedPlaylist)
+      // Pre-warm the cache so instant playback succeeds
+      await BiliFetcher.getAudioFilePath(best.bvid)
+      return Right({
+        matched: best,
+        score,
+        playlist: updatedPlaylist
+      })
+    } catch (err) {
+      logger.error('Failed to save playlist after auto-matching Bilibili:', err)
+      return Left({ error: `Failed to save playlist: ${stringifyCatchError(err)}` })
+    }
   })
