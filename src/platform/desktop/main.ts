@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
@@ -18,8 +18,6 @@ function preparePackagedEnvironment(): void {
   mkdirSync(userData, { recursive: true })
   mkdirSync(join(userData, 'cache'), { recursive: true })
   mkdirSync(join(userData, 'data'), { recursive: true })
-  const configFile = join(userData, 'music.toml')
-  if (!existsSync(configFile)) copyFileSync(join(process.resourcesPath, 'music.toml'), configFile)
   process.chdir(userData)
   process.env.NODE_ENV = 'production'
   process.env.SENA_ASSETS_DIR = join(process.resourcesPath, 'dist')
