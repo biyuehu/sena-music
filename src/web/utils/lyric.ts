@@ -1,5 +1,5 @@
 export interface ParsedLyricLine {
-  time: number // 秒
+  time: number
   original: string
   translation?: string
   romaji?: string
@@ -37,9 +37,6 @@ export function saveStoredLyricPreference(pref: LyricDisplayPreference): void {
   }
 }
 
-/**
- * 将单个标准 LRC 字符串解析为带时间戳的数组
- */
 export function parseSingleLrc(lrcText: string): Array<{ time: number; text: string }> {
   if (!lrcText?.trim()) return []
 
@@ -51,14 +48,12 @@ export function parseSingleLrc(lrcText: string): Array<{ time: number; text: str
     const trimmed = line.trim()
     if (!trimmed) continue
 
-    // 排除元数据标签如 [ti:], [ar:], [al:], [by:], [offset:]
     if (/^\[(ti|ar|al|by|offset):/i.test(trimmed)) continue
 
     const matches = [...trimmed.matchAll(timeRegex)]
     if (matches.length === 0) continue
 
     const text = trimmed.replace(timeRegex, '').trim()
-    // 如果该行只是空白，但具有时间戳，有时作为间奏占位
     for (const match of matches) {
       const minutes = parseInt(match[1], 10)
       const seconds = parseInt(match[2], 10)
@@ -71,9 +66,6 @@ export function parseSingleLrc(lrcText: string): Array<{ time: number; text: str
   return result.sort((a, b) => a.time - b.time)
 }
 
-/**
- * 将原文、翻译、音译（罗马音）三轨合并为一个有序结构化数组
- */
 export function mergeThreeTrackLyrics(
   originalLrc?: string,
   translationLrc?: string,
@@ -88,10 +80,9 @@ export function mergeThreeTrackLyrics(
 
   const offsetSec = offsetMs / 1000
 
-  // 辅助函数：根据时间戳（允许 0.2 秒误差）寻找匹配的歌词行
   const findMatch = (list: Array<{ time: number; text: string }>, targetTime: number): string | undefined => {
     let bestText: string | undefined
-    let minDiff = 0.25 // 允许 250ms 偏差
+    let minDiff = 0.25
     for (const item of list) {
       const diff = Math.abs(item.time - targetTime)
       if (diff < minDiff && item.text) {
@@ -114,9 +105,6 @@ export function mergeThreeTrackLyrics(
   })
 }
 
-/**
- * 根据当前播放时间找到对应的歌词索引
- */
 export function findActiveLyricIndex(lyrics: ParsedLyricLine[], currentTime: number): number {
   if (lyrics.length === 0 || currentTime < lyrics[0].time) return -1
 

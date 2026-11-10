@@ -77,30 +77,6 @@ function serializeAttr(val: unknown): string | null {
   return String(val)
 }
 
-/* 
-
-let cachedGlobalSheet = null;
-
-function getGlobalSheet() {
-  if (cachedGlobalSheet) return cachedGlobalSheet;
-
-  const sheet = new CSSStyleSheet();
-  // 提取 UnoCSS 或全局样式
-  // 注意：跨域的 <link> 样式表由于安全限制无法通过 cssRules 读取
-  const allCss = Array.from(document.styleSheets)
-    .filter(s => !s.href || s.href.startsWith(location.origin)) // 过滤掉跨域样式
-    .map(s => {
-      try {
-        return Array.from(s.cssRules).map(r => r.cssText).join('');
-      } catch (e) { return ''; }
-    }).join('\n');
-
-  sheet.replaceSync(allCss);
-  cachedGlobalSheet = sheet;
-  return sheet;
-}
-*/
-
 export function defineComponentFrom<T extends AnyFields>(
   fields: T,
   definition: Definition<T>
@@ -168,13 +144,10 @@ export function defineComponentFrom<T extends AnyFields>(
     }
 
     public disconnectedCallback(): void {
-      // 停止渲染 effect
       this.stopEffect?.()
       this.stopEffect = null
-      // 执行用户在 connectedCallback 里返回的清理函数
       if (typeof this.userCleanup === 'function') this.userCleanup()
       definition.disconnectedCallback?.(this as unknown as Host<T>)
-      // 重置首次渲染标记（元素可能被重新挂载）
       this.firstRendered = false
     }
 
@@ -184,7 +157,6 @@ export function defineComponentFrom<T extends AnyFields>(
       const sig = this.signals.get(name)
       if (!sig) return
       const parsed = parseAttr(next, (field as Prop).value)
-      // 避免 setAttribute ↔ signal 之间无限循环
       if (sig.value !== parsed) sig.value = parsed
     }
 
@@ -192,13 +164,6 @@ export function defineComponentFrom<T extends AnyFields>(
       if (!definition.render) return null
       const host = this as unknown as Host<T>
 
-      /**
-       * effect 立即执行一次（首次渲染），
-       * 之后每当 render 函数读取的任意 signal 变更时自动重跑。
-       *
-       * 批量更新场景（同一 tick 设多个 signal）请在调用处包裹 batch()：
-       *   batch(() => { host.a = 1; host.b = 2 })
-       */
       const fx = new Effect(
         () => {
           definition.willUpdate?.(host)

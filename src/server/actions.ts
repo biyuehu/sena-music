@@ -217,7 +217,6 @@ export const removeSongHandler = Action.empty<AppState>()
   )
 
 export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger }) => {
-  // 1. 加载本地歌单
   const localPlaylistResult = Data.load()
   if (localPlaylistResult.isLeft()) {
     logger.error('Failed to load local playlist:', localPlaylistResult.value)
@@ -225,7 +224,6 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
   }
   const localPlaylist = localPlaylistResult.value
 
-  // 2. 从网易云获取最新歌单
   const neteaseResult = await NeteaseFetcher.request()
   if (neteaseResult.isNothing()) {
     logger.error('Failed to fetch playlist from Netease')
@@ -233,26 +231,17 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
   }
   const neteasePlaylist = neteaseResult.value
 
-  // 3. 预处理：建立本地数据的快速索引
-  // id.length >= 36 为自定义歌曲 (UUID)
   const isCustom = (id: string) => id.length >= 36
   const localMap = new Map(localPlaylist.map((s) => [s.id, s]))
 
-  // 4. 更新网易云歌曲数据，但保留本地已修改的映射 (type !== 'netease')
   const updatedNeteaseSongs = neteasePlaylist.map((nSong) => {
     const localVersion = localMap.get(nSong.id)
-    // 如果本地存在且用户改过映射（比如改成了本地路径或其它 type），则保留本地版
-    if (localVersion && localVersion.type !== 'netease') {
-      return localVersion
-    }
-    return { ...nSong } // 否则使用网易云最新元数据
+    if (localVersion && localVersion.type !== 'netease') return localVersion
+    return { ...nSong }
   })
 
   const newNeteaseIdSet = new Set(updatedNeteaseSongs.map((s) => s.id))
 
-  // 5. 建立自定义歌曲的“锚点”映射
-  // key 是网易云歌曲 ID，value 是紧跟在其后的自定义歌曲列表
-  // null 键用于存放排在歌单最开头的自定义歌曲
   const customGroups = new Map<string | null, typeof localPlaylist>()
   let lastSeenNeteaseId: string | null = null
 
@@ -262,22 +251,16 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
       group.push(song)
       customGroups.set(lastSeenNeteaseId, group)
     } else if (newNeteaseIdSet.has(song.id)) {
-      // 只有在新歌单中依然存在的网易云歌曲才能作为有效的“锚点”
       lastSeenNeteaseId = song.id
     }
-    // 如果网易云歌曲被删了，lastSeenNeteaseId 不更新，
-    // 那么原本跟在它后面的自定义歌曲会顺延到上一个有效的锚点
   }
 
-  // 6. 线性合并：以网易云新顺序为骨架进行填充
   const mergedPlaylist: typeof localPlaylist = []
 
-  // A. 首先插入原本就在最开头的自定义歌曲
   if (customGroups.has(null)) {
     mergedPlaylist.push(...(customGroups.get(null) ?? []))
   }
 
-  // B. 遍历网易云新歌单，插入歌曲及其随后的自定义歌曲
   for (const nSong of updatedNeteaseSongs) {
     mergedPlaylist.push(nSong)
     if (customGroups.has(nSong.id)) {
@@ -285,7 +268,6 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
     }
   }
 
-  // C. 兜底逻辑：处理那些因为锚点全部消失而“无家可归”的自定义歌曲
   const placedIds = new Set(mergedPlaylist.map((s) => s.id))
   for (const song of localPlaylist) {
     if (isCustom(song.id) && !placedIds.has(song.id)) {
@@ -293,13 +275,11 @@ export const syncHandler = Action.empty<AppState>().bind(async (_data, { logger 
     }
   }
 
-  // 7. 重新生成标准的 order 间隔
   const finalPlaylist = mergedPlaylist.map((song, index) => ({
     ...song,
     order: index * PLAYLIST_SONG_ORDER_GAP
   }))
 
-  // 8. 保存并返回
   try {
     Data.save(finalPlaylist)
     logger.info(`Sync success: ${localPlaylist.length} -> ${finalPlaylist.length} songs.`)

@@ -52,7 +52,6 @@ export const editSongModal = defineComponent(
         host.customTranslation = ''
         host.customRomaji = ''
 
-        // 如果是自定义歌词，尝试异步拉取已有歌词填充表单
         if (host.lyricType === 'custom') {
           httpClient.getLyric({ id: host.song.id }).then((r) =>
             r.match({
@@ -248,7 +247,6 @@ export const editSongModal = defineComponent(
                 />
               </div>
 
-              <!-- 歌词设置折叠区 -->
               <div class="border border-[var(--lx-border)] rounded-lg p-3 bg-[var(--lx-bg-alt)]">
                 <div 
                   class="flex justify-between items-center cursor-pointer select-none"

@@ -58,7 +58,6 @@ describe('QQFetcher', () => {
 
   describe('request playlist', () => {
     it('should fetch playlist tracks', async () => {
-      // 8543787720 是公开歌单
       const result = await QQFetcher.request('8543787720')
       expect(result.isJust()).toBe(true)
 

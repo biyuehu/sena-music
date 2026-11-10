@@ -26,7 +26,6 @@ describe('Lyric Parser', () => {
     expect(merged[0].original).toBe('夢ならばどれほどよかったでしょう')
     expect(merged[0].translation).toBe('如果这一切都是梦境该有多好')
     expect(merged[0].romaji?.startsWith('yu me')).toBe(true)
-    // 包含 500ms offset
     expect(merged[0].time).toBeCloseTo(1.351, 2)
   })
 

@@ -24,7 +24,6 @@ class GlobalStyleWatcher {
     try {
       const allCss = Array.from(document.styleSheets)
         .filter((s) => {
-          // 避开跨域限制，否则访问 cssRules 会报错
           try {
             return !s.href || s.href.startsWith(location.origin)
           } catch {
@@ -53,7 +52,6 @@ class GlobalStyleWatcher {
 
     this.observer = Just(
       new MutationObserver(() => {
-        // 当 head 里的 style 变动时，延迟同步（防抖建议自行添加）
         this.sync()
       })
     )

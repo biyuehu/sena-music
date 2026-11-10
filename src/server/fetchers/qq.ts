@@ -100,7 +100,6 @@ export namespace QQFetcher {
   export function parseInput(rawInput: string): { songmid?: string; songid?: number } {
     const input = rawInput.trim()
 
-    // 匹配 URL 中的 songDetail/002TTnfc13TkgO 或 songDetail/728722164
     const detailMatch = input.match(/songDetail\/([0-9a-zA-Z]+)/i)
     if (detailMatch?.[1]) {
       const val = detailMatch[1]
@@ -108,30 +107,22 @@ export namespace QQFetcher {
       return { songmid: val }
     }
 
-    // 匹配 songmid 参数
     const midMatch = input.match(/[?&]songmid=([0-9a-zA-Z]+)/i)
     if (midMatch?.[1]) return { songmid: midMatch[1] }
 
-    // 匹配 songid 参数
     const idMatch = input.match(/[?&]songid=(\d+)/i)
     if (idMatch?.[1]) return { songid: parseInt(idMatch[1], 10) }
 
-    // 纯数字 ID
     if (/^\d+$/.test(input)) return { songid: parseInt(input, 10) }
 
-    // 纯字母数字 mid (通常 14 位，如 002TTnfc13TkgO)
     if (/^[0-9a-zA-Z]{14}$/.test(input)) return { songmid: input }
 
-    // 兜底提取连续 14 位字符
     const midSub = input.match(/([0-9a-zA-Z]{14})/)
     if (midSub?.[1]) return { songmid: midSub[1] }
 
     return {}
   }
 
-  /**
-   * 获取单曲详细信息
-   */
   export async function getSongDetail(rawInput: string): Promise<Maybe<QQSongDetail>> {
     const { songmid, songid } = parseInput(rawInput)
     if (!songmid && !songid) {
@@ -170,9 +161,6 @@ export namespace QQFetcher {
     }
   }
 
-  /**
-   * 获取 QQ 音乐真实可播放的直链 (vkey purl)
-   */
   export async function getPlayUrl(rawInput: string): Promise<Maybe<string>> {
     let { songmid, songid } = parseInput(rawInput)
 
@@ -278,9 +266,6 @@ export namespace QQFetcher {
     })
   }
 
-  /**
-   * 获取 QQ 音乐音频本地缓存文件路径
-   */
   export async function getAudioFilePath(rawInput: string): Promise<Maybe<string>> {
     let { songmid, songid } = parseInput(rawInput)
     if (!songmid && songid) {
@@ -348,9 +333,6 @@ export namespace QQFetcher {
     }
   }
 
-  /**
-   * 模仿 NeteaseFetcher.request，拉取 QQ 音乐歌单的所有歌曲
-   */
   export async function request(playlistId: number | string): Promise<Maybe<Playlist>> {
     const dissId = String(playlistId).trim()
     if (!dissId) {

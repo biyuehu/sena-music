@@ -116,7 +116,7 @@ export const AboutPage = defineComponent(
                     <img src="/logo.png" alt="星之声" class="w-14 h-14 shrink-0 object-contain rounded-xl" />
                     <div class="min-w-0">
                       <div class="flex items-center gap-3">
-                        <h1 class="text-2xl font-black tracking-tight text-[var(--lx-text)]">星之声</h1>
+                        <h1 class="text-2xl font-black tracking-tight text-[var(--lx-text)]">星之声 ⭐ Sena Music</h1>
                         <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-accent)] font-mono shrink-0">
                           v${packageJson.version}
                         </span>

@@ -6,6 +6,11 @@
   "type": "module",
   "license": "GPL-3.0",
   "author": "Arimura Romi <i@arimuraromi.com>",
+  "homepage": "https://github.com/biyuehu/sena-music",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/biyuehu/sena-music.git"
+  },
   "scripts": {
     "init": "lefthook install",
     "dev:server": "bun --watch src/server/app.ts",
@@ -65,10 +70,11 @@
   },
   "build": {
     "appId": "com.himenosena.music",
-    "productName": "星之声",
+    "productName": "星之声音乐",
     "directories": {
       "output": "release"
     },
+    "copyright": "Copyright © 2026 Arimura Romi",
     "files": [
       "dist/desktop/**",
       "logo.png",
@@ -90,7 +96,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "logo.ico"
+      "icon": "logo.ico",
+      "legalTrademarks": "Sena Music"
     }
   },
   "electronmon": {

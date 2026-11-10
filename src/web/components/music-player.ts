@@ -108,11 +108,10 @@ defineComponent(
     useGlobalStyles: true,
     styles: /* css */ `
         :host {
-    /* 必须让自定义标签本身在父级 flex 中占满剩余空间 */
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-width: 0; /* 防止子元素撑破容器 */
+    min-width: 0;
     width: 100%;
   }
       `,
@@ -392,7 +391,6 @@ defineComponent(
             savePlaybackTime(startTime)
           }
 
-          // 异步加载三轨歌词与封面颜色
           const currentSong = host.playlist[index]
           updateCoverColor(currentSong?.cover)
           host.lyrics = []
@@ -887,14 +885,12 @@ defineComponent(
 
         if (isInput) return
 
-        // 空格键 / 媒体播放暂停键：播放 / 暂停
         if (e.code === 'Space' || e.code === 'MediaPlayPause' || e.key === 'MediaPlayPause') {
           e.preventDefault()
           host.actions?.toggle()
           return
         }
 
-        // 上一首：[ 或 媒体上一首，网页模式下额外支持 Ctrl/Alt/Meta + 方向左
         if (
           e.code === 'BracketLeft' ||
           e.code === 'MediaTrackPrevious' ||
@@ -906,7 +902,6 @@ defineComponent(
           return
         }
 
-        // 下一首：] 或 媒体下一首，网页模式下额外支持 Ctrl/Alt/Meta + 方向右
         if (
           e.code === 'BracketRight' ||
           e.code === 'MediaTrackNext' ||
@@ -918,7 +913,6 @@ defineComponent(
           return
         }
 
-        // 方向左：快退 5 秒
         if (e.code === 'ArrowLeft' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
           e.preventDefault()
           if (!Number.isNaN(audio.duration) && audio.duration > 0) {
@@ -928,7 +922,6 @@ defineComponent(
           return
         }
 
-        // 方向右：快进 5 秒
         if (e.code === 'ArrowRight' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
           e.preventDefault()
           if (!Number.isNaN(audio.duration) && audio.duration > 0) {
@@ -938,7 +931,6 @@ defineComponent(
           return
         }
 
-        // 方向上：音量增加 5%
         if (e.code === 'ArrowUp' && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           const nextVol = Math.min(1, Math.round((host.volume + 0.05) * 100) / 100)
@@ -946,7 +938,6 @@ defineComponent(
           return
         }
 
-        // 方向下：音量减少 5%
         if (e.code === 'ArrowDown' && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           const nextVol = Math.max(0, Math.round((host.volume - 0.05) * 100) / 100)
@@ -954,7 +945,6 @@ defineComponent(
           return
         }
 
-        // M 键：静音 / 取消静音
         if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           if (host.volume > 0) {
@@ -966,21 +956,18 @@ defineComponent(
           return
         }
 
-        // F 键：全屏 / 退出全屏歌词界面
         if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           host.actions?.toggleFullscreen()
           return
         }
 
-        // O 键：切换播放模式（列表循环/随机/单曲/停止）
         if ((e.key === 'o' || e.key === 'O') && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           host.actions?.switchMode()
           return
         }
 
-        // / 键：快速聚焦搜索框
         if (e.key === '/' && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault()
           const root = host.shadowRoot
@@ -1299,7 +1286,6 @@ defineComponent(
     </div>
 
     <style>
-      /* 针对精细化滑块的样式，确保点击不偏移 */
       input[type=range] { -webkit-appearance: none; background: transparent; margin: 0; }
       input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; cursor: pointer; }
     </style>
@@ -1757,7 +1743,6 @@ defineComponent(
       </footer>
     </main>
 
-    <!-- 全屏沉浸式播放器（含多语言三轨歌词） -->
     <div class="fixed inset-0 bg-[var(--lx-main)] text-[var(--lx-text)] z-100 transition-all duration-500 ${host.isFullscreen ? 'translate-y-0 opacity-100 visible' : 'translate-y-full opacity-0 pointer-events-none invisible'} flex flex-col md:flex-row md:items-center md:justify-center overflow-hidden">
       ${
         host.coverColorBgEnabled && host.coverColor && song?.cover && !host.coverErrorMap[song.cover]
@@ -1779,7 +1764,6 @@ defineComponent(
         class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-20">
       </button>
 
-      <!-- 移动端视图（支持点击切换封面/歌词模式） -->
       <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-12 pb-6 overflow-hidden relative z-10">
         <div class="flex justify-between items-center shrink-0 py-2 z-20">
           <button
@@ -1822,7 +1806,6 @@ defineComponent(
         </div>
       </div>
 
-      <!-- 桌面端视图（左侧封面+控制，右侧沉浸式三轨歌词视窗） -->
       <div class="hidden md:flex w-full max-w-6xl h-full max-h-[85vh] px-12 flex-row items-center justify-between gap-16 relative z-10">
         <div class="flex flex-col gap-8 w-[380px] shrink-0">
           ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}

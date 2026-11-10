@@ -89,7 +89,6 @@ export function checkShortcutConflict(
   const cleanKey = accelerator.trim()
   if (!cleanKey) return { success: true }
 
-  // 1. 检查是否与当前应用内其他启用的快捷键冲突
   const internalConflict = shortcuts.find(
     (s) => s.id !== actionId && s.enabled && s.currentKey.trim().toLowerCase() === cleanKey.toLowerCase()
   )
@@ -97,7 +96,6 @@ export function checkShortcutConflict(
     return { success: false, error: `与已有快捷键「${internalConflict.name}」冲突` }
   }
 
-  // 2. 检查是否已被其他应用或系统占用
   const isAlreadyRegistered = globalShortcut.isRegistered(cleanKey)
   const isCurrentActionKey = shortcuts.find(
     (s) => s.id === actionId && s.enabled && s.currentKey.trim().toLowerCase() === cleanKey.toLowerCase()
@@ -106,7 +104,6 @@ export function checkShortcutConflict(
     return { success: false, error: '该快捷键已被系统或其他应用程序占用' }
   }
 
-  // 3. 尝试在 Electron 中预注册测试其合法性
   try {
     const testRegistered = globalShortcut.register(cleanKey, () => {})
     if (!testRegistered) {

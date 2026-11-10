@@ -309,10 +309,6 @@ export namespace BiliFetcher {
     })
   }
 
-  /**
-   * 获取 B 站音频本地缓存文件路径。
-   * 缓存优先；未命中时取直链，用 ffmpeg 转码为静态 MP3 落盘，转码期间用 lock 文件避免重复拉流。
-   */
   export async function getAudioFilePath(rawInput: string): Promise<Maybe<string>> {
     const infoResult = await getVideoInfo(rawInput)
     if (infoResult.isNothing()) return Nothing()

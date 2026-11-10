@@ -45,7 +45,6 @@ body {
   filter: invert(1) brightness(2) !important;
 }
 
-/* 高亮强调色状态的图标 (仅在自身或父级真正处于 text-[var(--lx-accent)] 状态时生效) */
 .text-\[var\(--lx-accent\)\] [class^="i-"],
 .text-\[var\(--lx-accent\)\] [class*=" i-"],
 [class^="i-"].text-\[var\(--lx-accent\)\],
@@ -53,7 +52,6 @@ body {
   filter: var(--lx-icon-hover-filter) !important;
 }
 
-/* 仅在指定了 hover:text-[var(--lx-accent)] 的元素悬停时应用强调色滤镜 */
 [class*="hover:text-[var(--lx-accent)]"]:hover > [class^="i-"],
 [class*="hover:text-[var(--lx-accent)]"]:hover > [class*=" i-"],
 [class*="hover:text-[var(--lx-accent)]"]:hover [class^="i-"],

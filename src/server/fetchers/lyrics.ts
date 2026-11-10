@@ -39,9 +39,6 @@ export namespace LyricFetcher {
     return join(Data.CACHE_DIRECTORY, `lyric+${songId}.json`)
   }
 
-  /**
-   * 从网易云接口拉取三轨歌词（原文、翻译、罗马音）
-   */
   export async function fetchNeteaseLyric(songId: string | number): Promise<Maybe<LyricResult>> {
     const id = String(songId).trim()
     if (!id || !/^\d+$/.test(id)) return Nothing()
@@ -56,7 +53,6 @@ export namespace LyricFetcher {
 
       const json = neteaseLyricSchema.parse(await res.json())
 
-      // 纯音乐判断
       if (json.nolyric || json.pureMusic) {
         return Just({ status: 'pure_music' })
       }
@@ -85,12 +81,8 @@ export namespace LyricFetcher {
     }
   }
 
-  /**
-   * 从 QQ 音乐接口拉取歌词与翻译
-   */
   export async function fetchQQLyric(rawInput: string): Promise<Maybe<LyricResult>> {
     const input = rawInput.trim()
-    // 匹配 14 位 mid，或直接使用
     const midMatch = input.match(/[0-9a-zA-Z]{14}/)
     const songmid = midMatch ? midMatch[0] : input
     if (!songmid) return Nothing()
@@ -107,7 +99,6 @@ export namespace LyricFetcher {
       let original = (json.lyric ?? '').trim()
       let translation = (json.trans ?? '').trim()
 
-      // 如果返回是 base64
       if (original && !original.includes('[')) {
         try {
           original = Buffer.from(original, 'base64').toString('utf-8').trim()
@@ -142,9 +133,6 @@ export namespace LyricFetcher {
     }
   }
 
-  /**
-   * 尝试从网易云按歌曲名称与歌手搜索最佳匹配的歌曲 ID
-   */
   export async function searchNeteaseSongId(name: string, artists: string[]): Promise<Maybe<number>> {
     const keyword = `${name} ${artists.join(' ')}`.trim()
     if (!keyword) return Nothing()
@@ -164,9 +152,6 @@ export namespace LyricFetcher {
     }
   }
 
-  /**
-   * 探测本地 LRC 文件
-   */
   export function fetchLocalLyric(filePath: string): Maybe<LyricResult> {
     const candidatePaths = [filePath.replace(/\.[^/.]+$/, '.lrc'), filePath]
     for (const p of candidatePaths) {
@@ -183,19 +168,14 @@ export namespace LyricFetcher {
     return Nothing()
   }
 
-  /**
-   * 综合调度获取某首歌曲的歌词
-   */
   export async function getLyric(song: SongInfo): Promise<LyricResult> {
     const config = song.lyricConfig
     const offset = config?.offset ?? 0
 
-    // 1. 若显式指定无歌词
     if (config?.type === 'none') {
       return { status: 'no_lyric', offset }
     }
 
-    // 2. 若显式指定自定义歌词
     if (config?.type === 'custom') {
       const custom = Data.loadCustomLyric(song.id)
       if (custom.isJust()) {
@@ -212,7 +192,6 @@ export namespace LyricFetcher {
       return { status: 'no_lyric', offset }
     }
 
-    // 3. 检查本地缓存（非 custom 模式下生效）
     const cacheFile = cacheFilePath(song.id)
     if (existsSync(cacheFile)) {
       try {
@@ -225,7 +204,6 @@ export namespace LyricFetcher {
 
     let result: Maybe<LyricResult> = Nothing()
 
-    // 4. 根据明确指定的歌词类型拉取
     if (config?.type === 'netease' && config.value?.trim()) {
       result = await fetchNeteaseLyric(config.value.trim())
     } else if (config?.type === 'qq' && config.value?.trim()) {
@@ -234,9 +212,7 @@ export namespace LyricFetcher {
       result = fetchLocalLyric(config.value.trim())
     }
 
-    // 5. 若未命中或处于 auto 模式
     if (result.isNothing()) {
-      // 原则是：只要不是用户自己新增的歌曲（比如网易云歌单原本有的，id < 36，或 type === 'netease'），默认直接走网易云
       const isOriginalNeteaseSong = song.id.length < 36 || song.type === 'netease'
       const neteaseId = song.type === 'netease' ? song.value || song.id : song.id
 
@@ -251,7 +227,6 @@ export namespace LyricFetcher {
         result = fetchLocalLyric(song.value)
       }
 
-      // 如果依然没找到，尝试按歌曲名与歌手进行网易云匹配兜底
       if (result.isNothing() || result.value.status === 'no_lyric') {
         const searchedId = await searchNeteaseSongId(song.name, song.artists)
         if (searchedId.isJust()) {
@@ -264,7 +239,6 @@ export namespace LyricFetcher {
     const finalResult: LyricResult = result.unwrapOrElse(() => ({ status: 'no_lyric' as const }))
     finalResult.offset = offset
 
-    // 写入本地缓存
     if (finalResult.status === 'ok' || finalResult.status === 'pure_music') {
       try {
         if (!existsSync(Data.CACHE_DIRECTORY)) mkdirSync(Data.CACHE_DIRECTORY, { recursive: true })

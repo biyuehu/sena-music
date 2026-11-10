@@ -203,7 +203,6 @@ export const addSongModal = defineComponent(
                 />
               </div>
 
-              <!-- 歌词设置折叠区 -->
               <div class="border border-[var(--lx-border)] rounded-lg p-3 bg-[var(--lx-bg-alt)]">
                 <div 
                   class="flex justify-between items-center cursor-pointer select-none"

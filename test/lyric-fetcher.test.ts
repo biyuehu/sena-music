@@ -4,7 +4,6 @@ import { LyricFetcher } from '../src/server/fetchers/lyrics'
 
 describe('LyricFetcher', () => {
   it('should fetch three-track lyrics (original, translation, romaji) for Japanese song on NetEase', async () => {
-    // 536622304 是 Lemon
     const res = await LyricFetcher.fetchNeteaseLyric(536622304)
     expect(res.isJust()).toBe(true)
     if (res.isJust()) {
@@ -33,7 +32,7 @@ describe('LyricFetcher', () => {
       name: 'Lemon',
       artists: ['米津玄師'],
       cover: '',
-      type: 'bili', // 即使改成 B 站，但保留网易云原始 ID 时依然默认走网易云三轨！
+      type: 'bili',
       value: 'BV14Gg46LEMh',
       order: 0
     }
