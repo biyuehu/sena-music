@@ -55,8 +55,8 @@ describe('Random Strategy & History Stack', () => {
     }
 
     function next(fixedNextIndex?: number) {
-      const nextIdx = fixedNextIndex ?? getRandomNextIndex(playlist.length, currentIndex)
-      play(nextIdx)
+      const nextIndex = fixedNextIndex ?? getRandomNextIndex(playlist.length, currentIndex)
+      play(nextIndex)
     }
 
     function prev() {

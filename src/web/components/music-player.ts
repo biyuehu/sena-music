@@ -42,7 +42,7 @@ interface PlayerActions {
   prev: () => void
   switchMode: () => void
   seek: (e: MouseEvent | Known) => void
-  setVolume: (val: number) => void
+  setVolume: (volume: number) => void
   openEditModal: (song: SongInfo, e: Event) => void
   toggleFullscreen: () => void
   syncPlaylist: () => void
@@ -129,9 +129,7 @@ defineComponent(
           return
         }
         extractCoverColor(coverUrl).then((color) => {
-          if (currentCoverUrl === coverUrl) {
-            host.coverColor = color
-          }
+          if (currentCoverUrl === coverUrl) host.coverColor = color
         })
       }
 
@@ -154,9 +152,7 @@ defineComponent(
           if (newIndex !== -1) {
             host.currentIndex = newIndex
             savePlaybackSong(newIndex, newPlaylist[newIndex])
-            if (newPlaylist[newIndex].cover !== currentCoverUrl) {
-              updateCoverColor(newPlaylist[newIndex].cover)
-            }
+            if (newPlaylist[newIndex].cover !== currentCoverUrl) updateCoverColor(newPlaylist[newIndex].cover)
           } else {
             host.currentIndex = Math.max(-1, Math.min(host.currentIndex, newPlaylist.length - 1))
           }
@@ -269,7 +265,7 @@ defineComponent(
             navigator.mediaSession.metadata = new MediaMetadata({
               title: song.name,
               artist: song.artists.join(' / '),
-              album: 'Sena Music',
+              album: '星之声',
               artwork: song.cover ? [{ src: song.cover, sizes: '512x512', type: 'image/jpeg' }] : []
             })
           }
@@ -373,15 +369,11 @@ defineComponent(
             !isPlayingFromHistory &&
             host.currentIndex >= 0 &&
             host.currentIndex !== index &&
-            host.currentIndex < host.playlist.length
+            host.currentIndex < host.playlist.length &&
+            host.playlist[host.currentIndex]
           ) {
-            const prevSong = host.playlist[host.currentIndex]
-            if (prevSong) {
-              randomHistory.push(prevSong.id)
-              if (randomHistory.length > 100) {
-                randomHistory.shift()
-              }
-            }
+            randomHistory.push(host.playlist[host.currentIndex].id)
+            if (randomHistory.length > 100) randomHistory.shift()
           }
           isPlayingFromHistory = false
           host.isUserManuallyPlaying = !onlyLoad
@@ -527,11 +519,11 @@ defineComponent(
             host.actions?.play(host.currentIndex)
             return
           }
-          const nextIndex =
+          host.actions?.play(
             host.playMode === 'random'
               ? getRandomNextIndex(host.playlist.length, host.currentIndex)
               : (host.currentIndex + 1) % host.playlist.length
-          host.actions?.play(nextIndex)
+          )
         },
         prev: (): void => {
           host.showVolumeBar = false
@@ -549,8 +541,7 @@ defineComponent(
                 return
               }
             }
-            const fallbackIndex = (host.currentIndex - 1 + host.playlist.length) % host.playlist.length
-            host.actions?.play(fallbackIndex)
+            host.actions?.play((host.currentIndex - 1 + host.playlist.length) % host.playlist.length)
             return
           }
 
@@ -581,15 +572,13 @@ defineComponent(
           }
         },
         seek: (e: Known): void => {
-          const val = parseFloat(e?.target?.value ?? e)
-          if (!Number.isNaN(val)) {
-            host.actions?.seekToRatio(val / 100, false)
-          }
+          const value = parseFloat(e?.target?.value ?? e)
+          if (!Number.isNaN(value)) host.actions?.seekToRatio(value / 100, false)
         },
-        setVolume: (val: number): void => {
-          if (val > 0) lastVolume = val
-          audio.volume = host.volume = val
-          Storage.set('play-volume', val)
+        setVolume: (volume: number): void => {
+          if (volume > 0) lastVolume = volume
+          audio.volume = host.volume = volume
+          Storage.set('play-volume', volume)
         },
         toggleFullscreen: (): void => {
           host.showVolumeBar = false
@@ -689,7 +678,7 @@ defineComponent(
           const root = host.shadowRoot
           if (!root) return
           const lineEls = root.querySelectorAll(`[data-lyric-index="${host.activeLyricIndex}"]`)
-          lineEls.forEach((el) => {
+          for (const el of lineEls) {
             const lineEl = el as HTMLElement
             const container = lineEl.closest('.lyric-scroll-container') as HTMLElement | null
             if (container && container.clientHeight > 0) {
@@ -703,7 +692,7 @@ defineComponent(
                 behavior: smooth ? 'smooth' : 'auto'
               })
             }
-          })
+          }
         },
         handleLyricScroll: (): void => {
           host.isUserScrollingLyrics = true
@@ -1401,13 +1390,13 @@ defineComponent(
               @wheel=${() => host.actions?.handleLyricScroll()}
               @touchmove=${() => host.actions?.handleLyricScroll()}
             >
-              ${host.lyrics.map((line, idx) => {
-                const isActive = idx === host.activeLyricIndex
-                const isPast = idx < host.activeLyricIndex
+              ${host.lyrics.map((line, index) => {
+                const isActive = index === host.activeLyricIndex
+                const isPast = index < host.activeLyricIndex
 
                 return html`
                   <div
-                    data-lyric-index="${idx}"
+                    data-lyric-index="${index}"
                     @click=${(e: Event) => {
                       e.stopPropagation()
                       host.actions?.seekToTime(line.time)
@@ -1668,11 +1657,11 @@ defineComponent(
           />
         </div>
         <div class="flex items-center gap-2">
-          <button @click=${() => host.actions?.syncPlaylist()} class="flex items-center gap-2 p-1.5 rounded text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 transition-opacity font-medium">
-            <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span>同步歌单</span>
+          <button @click=${() => host.actions?.syncPlaylist()} title="同步歌单" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm bg-[var(--lx-accent)] text-white hover:opacity-90 transition-opacity font-medium">
+            <div class="i-carbon-renew ${host.isSyncing ? 'animate-spin' : ''}"></div><span class="hidden sm:inline">同步歌单</span>
           </button>
-          <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} class="flex items-center gap-2 p-1.5 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors">
-            <div class="i-carbon-add"></div><span>添加歌曲</span>
+          <button @click=${() => (host.isPlaying ? showToast('播放中无法添加歌曲') : host.actions?.openAddSongModal())} title="添加歌曲" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors">
+            <div class="i-carbon-add"></div><span class="hidden sm:inline">添加歌曲</span>
           </button>
           <theme-toggle></theme-toggle>
         </div>

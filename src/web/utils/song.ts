@@ -24,9 +24,6 @@ export async function getSongUrl(song: SongInfo): Promise<Either<string, string>
 
 export function getRandomNextIndex(length: number, currentIndex: number): number {
   if (length <= 1) return 0
-  let next = Math.floor(Math.random() * (length - 1))
-  if (currentIndex >= 0 && next >= currentIndex) {
-    next += 1
-  }
-  return next
+  const next = Math.floor(Math.random() * (length - 1))
+  return currentIndex >= 0 && next >= currentIndex ? next + 1 : next
 }

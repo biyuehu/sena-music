@@ -317,7 +317,7 @@ defineComponent(
                       <span class="text-sm">加载中...</span>
                     </div>`
                   : html`
-                    <div class="max-w-md flex flex-col gap-5">
+                    <div class="max-w-2xl flex flex-col gap-5">
                       <label class="flex flex-col gap-1.5">
                         <span class="text-xs font-bold opacity-70">网易云歌单 ID</span>
                         <input
@@ -401,14 +401,14 @@ defineComponent(
                         <span class="text-xs font-bold opacity-50 uppercase tracking-wider">外观与播放</span>
                       </div>
 
-                      <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex flex-col gap-0.5">
+                      <label class="flex items-center justify-between gap-4 cursor-pointer select-none">
+                        <div class="flex-1 min-w-0 flex flex-col gap-0.5 pr-2">
                           <span class="text-xs font-bold opacity-70">网易云源播放失败自动尝试匹配 B站音源</span>
-                          <span class="text-[11px] opacity-40">播放遇到版权或 VIP 限制失败时，自动搜索 B站匹配最佳音源并应用</span>
+                          <span class="text-[11px] opacity-40 leading-relaxed">播放遇到版权或 VIP 限制失败时，自动搜索 B站匹配最佳音源并应用</span>
                         </div>
                         <input
                           type="checkbox"
-                          class="w-4 h-4 cursor-pointer"
+                          class="w-4 h-4 shrink-0 cursor-pointer accent-[var(--lx-accent)]"
                           .checked=${host.autoMatchBiliOnError}
                           @change=${(e: Event) => {
                             host.autoMatchBiliOnError = (e.target as HTMLInputElement).checked
@@ -417,11 +417,13 @@ defineComponent(
                         />
                       </label>
 
-                      <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <span class="text-xs font-bold opacity-70">播放失败时自动切换到下一首</span>
+                      <label class="flex items-center justify-between gap-4 cursor-pointer select-none">
+                        <div class="flex-1 min-w-0 flex flex-col gap-0.5 pr-2">
+                          <span class="text-xs font-bold opacity-70">播放失败时自动切换到下一首</span>
+                        </div>
                         <input
                           type="checkbox"
-                          class="w-4 h-4 cursor-pointer"
+                          class="w-4 h-4 shrink-0 cursor-pointer accent-[var(--lx-accent)]"
                           .checked=${host.autoNextOnError}
                           @change=${(e: Event) => {
                             host.autoNextOnError = (e.target as HTMLInputElement).checked
@@ -430,14 +432,14 @@ defineComponent(
                         />
                       </label>
 
-                      <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex flex-col gap-0.5">
+                      <label class="flex items-center justify-between gap-4 cursor-pointer select-none">
+                        <div class="flex-1 min-w-0 flex flex-col gap-0.5 pr-2">
                           <span class="text-xs font-bold opacity-70">全屏音频可视化背景</span>
-                          <span class="text-[11px] opacity-40">在全屏播放器背景显示随音乐律动的动态光影效果</span>
+                          <span class="text-[11px] opacity-40 leading-relaxed">在全屏播放器背景显示随音乐律动的动态光影效果</span>
                         </div>
                         <input
                           type="checkbox"
-                          class="w-4 h-4 cursor-pointer"
+                          class="w-4 h-4 shrink-0 cursor-pointer accent-[var(--lx-accent)]"
                           .checked=${host.visualizerEnabled}
                           @change=${(e: Event) => {
                             host.visualizerEnabled = (e.target as HTMLInputElement).checked
@@ -449,14 +451,14 @@ defineComponent(
                         />
                       </label>
 
-                      <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex flex-col gap-0.5">
+                      <label class="flex items-center justify-between gap-4 cursor-pointer select-none">
+                        <div class="flex-1 min-w-0 flex flex-col gap-0.5 pr-2">
                           <span class="text-xs font-bold opacity-70">全屏封面色彩背景</span>
-                          <span class="text-[11px] opacity-40">在全屏播放器背景根据当前歌曲封面主色调变换氛围色彩</span>
+                          <span class="text-[11px] opacity-40 leading-relaxed">在全屏播放器背景根据当前歌曲封面主色调变换氛围色彩</span>
                         </div>
                         <input
                           type="checkbox"
-                          class="w-4 h-4 cursor-pointer"
+                          class="w-4 h-4 shrink-0 cursor-pointer accent-[var(--lx-accent)]"
                           .checked=${host.coverColorBgEnabled}
                           @change=${(e: Event) => {
                             host.coverColorBgEnabled = (e.target as HTMLInputElement).checked
@@ -635,7 +637,7 @@ defineComponent(
                                       <div class="flex items-center gap-2 flex-none">
                                         <input
                                           type="checkbox"
-                                          class="w-4 h-4 cursor-pointer"
+                                          class="w-4 h-4 shrink-0 cursor-pointer accent-[var(--lx-accent)]"
                                           title="${item.enabled ? '已启用该快捷键' : '已禁用该快捷键'}"
                                           .checked=${item.enabled}
                                           @change=${async (e: Event) => {

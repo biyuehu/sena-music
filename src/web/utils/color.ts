@@ -19,11 +19,11 @@ export const computeDominantColor = (pixels: Uint8ClampedArray | number[]): RGB 
   const totalPixels = Math.floor(pixels.length / 4)
 
   for (let i = 0; i < totalPixels; i++) {
-    const idx = i * 4
-    const r = pixels[idx]
-    const g = pixels[idx + 1]
-    const b = pixels[idx + 2]
-    const a = pixels[idx + 3]
+    const offset = i * 4
+    const r = pixels[offset]
+    const g = pixels[offset + 1]
+    const b = pixels[offset + 2]
+    const a = pixels[offset + 3]
 
     // Skip transparent or semi-transparent pixels
     if (a < 128) continue
@@ -64,9 +64,7 @@ export const computeDominantColor = (pixels: Uint8ClampedArray | number[]): RGB 
 
   let bestBin: { count: number; r: number; g: number; b: number; score: number } | null = null
   for (const bin of bins.values()) {
-    if (!bestBin || bin.score > bestBin.score) {
-      bestBin = bin
-    }
+    if (!bestBin || bin.score > bestBin.score) bestBin = bin
   }
 
   if (!bestBin || bestBin.count === 0) return null
@@ -87,9 +85,7 @@ export const extractCoverColor = (url: string): Promise<string | null> => {
   const cached = colorCache.get(url)
   if (cached) return Promise.resolve(cached)
 
-  if (typeof Image === 'undefined' || typeof document === 'undefined') {
-    return Promise.resolve(null)
-  }
+  if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve(null)
 
   return new Promise((resolve) => {
     try {
@@ -103,28 +99,20 @@ export const extractCoverColor = (url: string): Promise<string | null> => {
           canvas.width = size
           canvas.height = size
           const ctx = canvas.getContext('2d')
-          if (!ctx) {
-            resolve(null)
-            return
-          }
+          if (!ctx) return resolve(null)
           ctx.drawImage(img, 0, 0, size, size)
           const imageData = ctx.getImageData(0, 0, size, size)
           const rgb = computeDominantColor(imageData.data)
-          if (rgb) {
-            const colorStr = `${rgb.r}, ${rgb.g}, ${rgb.b}`
-            colorCache.set(url, colorStr)
-            resolve(colorStr)
-          } else {
-            resolve(null)
-          }
+          if (!rgb) return resolve(null)
+          const colorStr = `${rgb.r}, ${rgb.g}, ${rgb.b}`
+          colorCache.set(url, colorStr)
+          resolve(colorStr)
         } catch {
           resolve(null)
         }
       }
 
-      img.onerror = () => {
-        resolve(null)
-      }
+      img.onerror = () => resolve(null)
 
       img.src = url
     } catch {
