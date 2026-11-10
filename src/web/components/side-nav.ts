@@ -92,8 +92,8 @@ export const sideNav = defineComponent(
 
         <div class="p-4 flex items-center justify-between mb-4 border-b border-[var(--lx-border)]">
           <div class="flex items-center gap-2">
-            <img src="/logo.svg" alt="Sena Music" class="w-8 h-8 shrink-0 object-contain" />
-            <span class="font-bold text-sm tracking-tight truncate">Sena Music</span>
+            <img src="/logo.png" alt="星之声" class="w-8 h-8 shrink-0 object-contain" />
+            <span class="font-bold text-sm tracking-tight truncate">星之声</span>
           </div>
         </div>
         <div class="flex-1 px-2 space-y-1">

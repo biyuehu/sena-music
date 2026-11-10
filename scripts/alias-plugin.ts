@@ -1,8 +1,6 @@
 import { join } from 'node:path'
 import type { BunPlugin } from 'bun'
 
-const ROOT = join(import.meta.dir, '..')
-
 const ALIASES: [RegExp, (match: RegExpMatchArray) => string][] = [
   [/^@\/romi\/client$/, () => 'src/framework/core/client.ts'],
   [/^@\/romi\/web$/, () => 'src/framework/web/index.ts'],
@@ -19,7 +17,7 @@ export const aliasPlugin: BunPlugin = {
         const match = args.path.match(pattern)
         return match ? toTarget(match) : undefined
       }).find((target) => target !== undefined)
-      return matched ? { path: Bun.resolveSync(`./${matched}`, ROOT) } : undefined
+      return matched ? { path: Bun.resolveSync(`./${matched}`, join(import.meta.dir, '..')) } : undefined
     })
   }
 }

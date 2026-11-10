@@ -32,8 +32,7 @@ const resultPreload = await Bun.build({
   minify: !watching
 })
 
-const success = resultMain.success && resultPreload.success
-if (success) {
+if (resultMain.success && resultPreload.success) {
   console.log('Built desktop process: main.js and preload.cjs (cjs)')
 } else {
   for (const log of [...resultMain.logs, ...resultPreload.logs]) console.error(log)

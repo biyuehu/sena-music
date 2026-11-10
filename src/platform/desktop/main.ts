@@ -79,7 +79,7 @@ function updateTrayMenu(): void {
     ? `${currentPlaybackState.isPlaying ? '正在播放' : '已暂停'}：${currentPlaybackState.title}${
         currentPlaybackState.artist ? ` - ${currentPlaybackState.artist}` : ''
       }`
-    : 'Sena Music'
+    : '星之声'
 
   tray.setToolTip(titleText)
 
@@ -127,7 +127,7 @@ function updateTrayMenu(): void {
       }
     },
     {
-      label: '退出 Sena Music',
+      label: '退出 星之声',
       click: () => {
         isQuitting = true
         app.quit()
@@ -276,7 +276,7 @@ async function createWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
-    title: 'Sena Music',
+    title: '星之声',
     icon: appIcon,
     show: false,
     webPreferences: {
@@ -358,8 +358,8 @@ async function createWindow(): Promise<BrowserWindow> {
     event.preventDefault()
     const result = await dialog.showMessageBox(window, {
       type: 'question',
-      title: 'Sena Music',
-      message: '关闭 Sena Music',
+      title: '星之声',
+      message: '关闭 星之声',
       detail: '请选择关闭窗口时的操作：',
       buttons: ['最小化到系统托盘', '直接退出程序', '取消'],
       defaultId: 0,

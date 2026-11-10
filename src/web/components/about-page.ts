@@ -31,6 +31,7 @@ export const AboutPage = defineComponent(
         font-size: 0.75rem;
         font-weight: 600;
         line-height: 1;
+        white-space: nowrap;
         color: var(--lx-text);
         background-color: var(--lx-hover);
         border: 1px solid var(--lx-border);
@@ -103,101 +104,100 @@ export const AboutPage = defineComponent(
       return html`
         <div class="flex flex-col flex-1 h-full min-h-0 bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
           <main class="flex-1 flex flex-col min-w-0 min-h-0">
-            <!-- 顶栏 -->
             <div class="flex-none flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--lx-border)] bg-[var(--lx-bg-alt)]">
               <span class="font-bold text-sm">关于</span>
               <theme-toggle></theme-toggle>
             </div>
 
-            <!-- 可滚动内容区域 -->
-            <div class="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 max-w-4xl w-full mx-auto">
-              <!-- 项目简介卡片 -->
-              <div class="p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
-                <div class="flex items-center gap-4">
-                  <img src="/logo.svg" alt="Sena Music" class="w-14 h-14 shrink-0 object-contain" />
-                  <div>
-                    <div class="flex items-center gap-3">
-                      <h1 class="text-2xl font-black tracking-tight text-[var(--lx-text)]">Sena Music</h1>
-                      <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-accent)] font-mono">
-                        v${packageJson.version}
-                      </span>
+            <div class="flex-1 overflow-y-auto no-scrollbar min-h-0 p-4 md:p-6 space-y-6">
+              <div class="max-w-4xl w-full space-y-6">
+                <div class="p-5 sm:p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-sm">
+                  <div class="flex items-center gap-4 min-w-0">
+                    <img src="/logo.png" alt="星之声" class="w-14 h-14 shrink-0 object-contain rounded-xl" />
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-3">
+                        <h1 class="text-2xl font-black tracking-tight text-[var(--lx-text)]">星之声</h1>
+                        <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-accent)] font-mono shrink-0">
+                          v${packageJson.version}
+                        </span>
+                      </div>
+                      <p class="text-xs text-[var(--lx-text-muted)] mt-1 leading-normal break-words">轻量级自托管多源音乐聚合播放器</p>
                     </div>
-                    <p class="text-xs text-[var(--lx-text-muted)] mt-1">轻量级自托管多源音乐聚合播放器</p>
+                  </div>
+
+                  <div class="flex items-center gap-2 flex-wrap shrink-0">
+                    <a
+                      href="https://github.com/biyuehu/sena-music"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="GitHub 仓库"
+                      class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
+                    >
+                      <div class="i-carbon-logo-github text-sm"></div>
+                      <span class="hidden sm:inline">GitHub 仓库</span>
+                    </a>
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-text-muted)]">
+                      <span class="hidden sm:inline">开源协议: </span>${packageJson.license}
+                    </span>
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2 flex-wrap">
-                  <a
-                    href="https://github.com/biyuehu/sena-music"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[var(--lx-hover)] hover:bg-[var(--lx-border)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors"
-                  >
-                    <div class="i-carbon-logo-github text-sm"></div>
-                    <span>GitHub 仓库</span>
-                  </a>
-                  <span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-text-muted)]">
-                    开源协议: ${packageJson.license}
-                  </span>
-                </div>
-              </div>
+                <div class="p-5 sm:p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] space-y-5 shadow-sm">
+                  <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--lx-border)]">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="i-carbon-keyboard text-xl text-[var(--lx-accent)] shrink-0"></div>
+                      <h2 class="text-base font-bold text-[var(--lx-text)]">应用内快捷键</h2>
+                    </div>
+                    <span class="text-xs text-[var(--lx-text-muted)]">输入框聚焦时自动规避冲突</span>
+                  </div>
 
-              <!-- 应用内快捷键帮助 -->
-              <div class="p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] space-y-6 shadow-sm">
-                <div class="flex items-center gap-2.5 pb-3 border-b border-[var(--lx-border)]">
-                  <div class="i-carbon-keyboard text-xl text-[var(--lx-accent)]"></div>
-                  <h2 class="text-base font-bold text-[var(--lx-text)]">应用内快捷键</h2>
-                  <span class="text-xs text-[var(--lx-text-muted)] ml-auto">输入框聚焦时自动规避冲突</span>
-                </div>
-
-                <div class="space-y-6">
-                  ${shortcuts.map(
-                    (group) => html`
-                      <div class="space-y-3">
-                        <span class="text-xs font-bold opacity-60 uppercase tracking-wider">${group.category}</span>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          ${group.items.map(
-                            (item) => html`
-                              <div class="flex items-center justify-between p-3 rounded-xl bg-[var(--lx-main)] border border-[var(--lx-border)]">
-                                <div class="flex flex-col gap-0.5 min-w-0 pr-2">
-                                  <span class="text-xs font-bold text-[var(--lx-text)]">${item.desc}</span>
-                                  <span class="text-[11px] text-[var(--lx-text-muted)] truncate">${item.note}</span>
+                  <div class="space-y-5">
+                    ${shortcuts.map(
+                      (group) => html`
+                        <div class="space-y-2.5">
+                          <span class="text-xs font-bold opacity-60 uppercase tracking-wider">${group.category}</span>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${group.items.map(
+                              (item) => html`
+                                <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-[var(--lx-main)] border border-[var(--lx-border)]">
+                                  <div class="flex flex-col gap-1 min-w-[130px] flex-1">
+                                    <span class="text-xs font-bold text-[var(--lx-text)] leading-snug">${item.desc}</span>
+                                    <span class="text-[11px] text-[var(--lx-text-muted)] leading-relaxed break-words">${item.note}</span>
+                                  </div>
+                                  <div class="flex items-center gap-1 flex-wrap shrink-0">
+                                    ${item.keys.map((k) => html`<kbd>${k}</kbd>`)}
+                                  </div>
                                 </div>
-                                <div class="flex items-center gap-1 shrink-0">
-                                  ${item.keys.map((k) => html`<kbd>${k}</kbd>`)}
-                                </div>
-                              </div>
-                            `
-                          )}
+                              `
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    `
-                  )}
-                </div>
-              </div>
-
-              <!-- 核心特性卡片 -->
-              <div class="p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] space-y-4 shadow-sm">
-                <div class="flex items-center gap-2.5 pb-3 border-b border-[var(--lx-border)]">
-                  <div class="i-carbon-information text-xl text-[var(--lx-accent)]"></div>
-                  <h2 class="text-base font-bold text-[var(--lx-text)]">核心特性与功能</h2>
+                      `
+                    )}
+                  </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  ${features.map(
-                    (f) => html`
-                      <div class="p-3.5 rounded-xl bg-[var(--lx-main)] border border-[var(--lx-border)] space-y-1">
-                        <div class="text-xs font-bold text-[var(--lx-accent)]">${f.title}</div>
-                        <div class="text-[11px] text-[var(--lx-text-muted)] leading-relaxed">${f.desc}</div>
-                      </div>
-                    `
-                  )}
-                </div>
-              </div>
+                <div class="p-5 sm:p-6 rounded-2xl bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] space-y-4 shadow-sm">
+                  <div class="flex items-center gap-2.5 pb-3 border-b border-[var(--lx-border)]">
+                    <div class="i-carbon-information text-xl text-[var(--lx-accent)] shrink-0"></div>
+                    <h2 class="text-base font-bold text-[var(--lx-text)]">核心特性与功能</h2>
+                  </div>
 
-              <!-- 底部版权说明 -->
-              <div class="text-center text-xs text-[var(--lx-text-muted)] py-4 opacity-70">
-                <p>Sena Music © 2026 Arimura Romi. Built with Lit, Bun & UnoCSS.</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    ${features.map(
+                      (f) => html`
+                        <div class="p-3.5 rounded-xl bg-[var(--lx-main)] border border-[var(--lx-border)] space-y-1">
+                          <div class="text-xs font-bold text-[var(--lx-accent)]">${f.title}</div>
+                          <div class="text-[11px] text-[var(--lx-text-muted)] leading-relaxed break-words">${f.desc}</div>
+                        </div>
+                      `
+                    )}
+                  </div>
+                </div>
+
+                <div class="text-center text-xs text-[var(--lx-text-muted)] py-4 opacity-70">
+                  <p>SenaMusic © 2026 Arimura Romi.</p>
+                </div>
               </div>
             </div>
           </main>

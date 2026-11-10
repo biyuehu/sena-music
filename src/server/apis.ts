@@ -155,7 +155,16 @@ const assets = Api.new(
     ],
     async (reqRaw, resRaw) => {
       const url = reqRaw.url?.split('?')[0]
-      if (url === '/logo.svg' || url === '/favicon.ico' || url === '/favicon.svg') {
+      if (url === '/logo.png' || url === '/logo.svg' || url === '/favicon.ico' || url === '/favicon.svg') {
+        const logoPngPath = join(process.cwd(), 'logo.png')
+        if (existsSync(logoPngPath)) {
+          resRaw.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          })
+          createReadStream(logoPngPath).pipe(resRaw)
+          return
+        }
         const logoPath = join(process.cwd(), 'logo.svg')
         if (existsSync(logoPath)) {
           resRaw.writeHead(200, {

@@ -65,7 +65,7 @@
   },
   "build": {
     "appId": "com.himenosena.music",
-    "productName": "Sena Music",
+    "productName": "星之声",
     "directories": {
       "output": "release"
     },
