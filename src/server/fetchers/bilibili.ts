@@ -136,6 +136,62 @@ export namespace BiliFetcher {
     return { page }
   }
 
+  async function getVideoInfoFromHtml(bvid?: string, aid?: number, page = 1): Promise<Maybe<BiliVideoInfo>> {
+    try {
+      const targetUrl = `https://www.bilibili.com/video/${bvid || `av${aid}`}`
+      const res = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': DEFAULT_USER_AGENT,
+          Referer: 'https://www.bilibili.com/',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      })
+      if (!res.ok) {
+        logger.warn(`Bilibili video page returned HTTP ${res.status} for ${targetUrl}`)
+        return Nothing()
+      }
+      const html = await res.text()
+      const match = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{.+?\});/)
+      if (!match?.[1]) {
+        logger.warn(`Could not find __INITIAL_STATE__ in Bilibili video page for ${targetUrl}`)
+        return Nothing()
+      }
+      const parsed = JSON.parse(match[1]) as {
+        videoData?: {
+          bvid: string
+          aid: number
+          cid: number
+          title: string
+          pic: string
+          duration: number
+          owner?: { name: string }
+          pages?: Array<{ cid: number; page: number; part: string; duration: number }>
+        }
+      }
+      const data = parsed.videoData
+      if (!data) return Nothing()
+
+      const pages = data.pages || []
+      const targetPage = pages.find((p) => p.page === page) ??
+        pages[0] ?? { cid: data.cid, page: 1, part: data.title, duration: data.duration }
+
+      return Just({
+        bvid: data.bvid,
+        aid: data.aid,
+        cid: targetPage.cid,
+        title: data.title,
+        cover: data.pic,
+        artist: data.owner?.name || 'Bilibili',
+        duration: targetPage.duration || data.duration,
+        partName: targetPage.part || data.title,
+        page: targetPage.page || 1
+      })
+    } catch (err) {
+      logger.warn('Failed to parse Bilibili video info from HTML fallback:', err)
+      return Nothing()
+    }
+  }
+
   export async function getVideoInfo(rawInput: string): Promise<Maybe<BiliVideoInfo>> {
     const { bvid, aid, page } = await parseInput(rawInput)
     if (!bvid && !aid) {
@@ -152,8 +208,8 @@ export namespace BiliFetcher {
       })
 
       if (!res.ok) {
-        logger.error(`Bilibili view API returned HTTP ${res.status}: ${res.statusText}`)
-        return Nothing()
+        logger.warn(`Bilibili view API returned HTTP ${res.status}: ${res.statusText}, trying HTML fallback...`)
+        return getVideoInfoFromHtml(bvid, aid, page)
       }
 
       const text = await res.text()
@@ -174,13 +230,15 @@ export namespace BiliFetcher {
       try {
         json = JSON.parse(text)
       } catch {
-        logger.error(`Bilibili view API returned non-JSON (HTTP ${res.status}): ${text.slice(0, 200)}`)
-        return Nothing()
+        logger.warn(`Bilibili view API returned non-JSON (HTTP ${res.status}), trying HTML fallback...`)
+        return getVideoInfoFromHtml(bvid, aid, page)
       }
 
       if (json.code !== 0 || !json.data) {
-        logger.error(`Bilibili view API error: [code ${json.code}] ${json.message || 'Unknown error'}`)
-        return Nothing()
+        logger.warn(
+          `Bilibili view API error: [code ${json.code}] ${json.message || 'Unknown error'}, trying HTML fallback...`
+        )
+        return getVideoInfoFromHtml(bvid, aid, page)
       }
 
       const data = json.data
@@ -200,8 +258,8 @@ export namespace BiliFetcher {
         page: targetPage.page || 1
       })
     } catch (err) {
-      logger.error('Failed to fetch Bilibili video info:', err)
-      return Nothing()
+      logger.warn('Failed to fetch Bilibili video info from API, trying HTML fallback:', err)
+      return getVideoInfoFromHtml(bvid, aid, page)
     }
   }
 

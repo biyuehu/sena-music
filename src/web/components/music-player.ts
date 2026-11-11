@@ -735,6 +735,23 @@ defineComponent(
 
       audio.onloadedmetadata = (): void => {
         if (!Number.isNaN(audio.duration) && audio.duration > 0) {
+          const currentSong = host.playlist[host.currentIndex]
+          if (
+            currentSong &&
+            currentSong.type === 'netease' &&
+            !isAutoMatchingBili &&
+            (audio.duration <= 32 ||
+              (host.lyrics.length > 0 &&
+                host.lyrics[host.lyrics.length - 1].time > audio.duration + 20 &&
+                audio.duration <= 60))
+          ) {
+            audio.pause()
+            audio.currentTime = 0
+            showToast(`「${currentSong.name}」检测到试听片段，正在自动匹配备选音源...`, 'info')
+            handlePlayError(host.currentIndex, '试听片段')
+            return
+          }
+
           host.duration = formatTime(audio.duration)
           if (!host.isDragging) {
             host.progress = (audio.currentTime / audio.duration) * 100 || 0
@@ -772,6 +789,19 @@ defineComponent(
       }
       audio.onended = (): void => {
         savePlaybackTime(0)
+        const currentSong = host.playlist[host.currentIndex]
+        if (
+          currentSong &&
+          currentSong.type === 'netease' &&
+          !isAutoMatchingBili &&
+          !Number.isNaN(audio.duration) &&
+          audio.duration <= 32
+        ) {
+          showToast(`「${currentSong.name}」试听结束，正在尝试匹配 B站音源...`, 'info')
+          handlePlayError(host.currentIndex, '试听片段')
+          return
+        }
+
         if (host.playMode === 'single-loop') {
           audio.currentTime = 0
           audio.play()
