@@ -1,3 +1,4 @@
+import 'virtual:uno.css'
 import { initTheme } from './service/theme'
 
 import './components/toast'
