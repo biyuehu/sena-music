@@ -1,7 +1,8 @@
 Add-Type -AssemblyName System.Drawing
 
 $rootDir = Split-Path -Parent $PSScriptRoot
-$logoPath = Join-Path $rootDir "logo.png"
+$publicDir = Join-Path $rootDir "public"
+$logoPath = Join-Path $publicDir "logo.png"
 
 if (-not (Test-Path $logoPath)) {
     Write-Error "logo.png not found at $logoPath"
@@ -9,7 +10,7 @@ if (-not (Test-Path $logoPath)) {
 }
 
 $srcImg = [System.Drawing.Bitmap]::FromFile($logoPath)
-Write-Host "Loaded logo.png: $($srcImg.Width)x$($srcImg.Height)"
+Write-Host "Loaded public/logo.png: $($srcImg.Width)x$($srcImg.Height)"
 
 function CreateResizedPng([System.Drawing.Bitmap]$src, [int]$w, [int]$h, [double]$ratio, [string]$outPath, [System.Drawing.Color]$bgColor = [System.Drawing.Color]::Transparent) {
     $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
@@ -137,18 +138,17 @@ CreateResizedPng $srcImg 720 1280 0.50 (Join-Path $androidRes "drawable-port-xhd
 CreateResizedPng $srcImg 960 1600 0.50 (Join-Path $androidRes "drawable-port-xxhdpi\splash.png") $white
 CreateResizedPng $srcImg 1280 1920 0.50 (Join-Path $androidRes "drawable-port-xxxhdpi\splash.png") $white
 
-# 3. Windows ICO for Electron
-$icoPath = Join-Path $rootDir "logo.ico"
-CreateIco $srcImg @(16, 24, 32, 48, 64, 128, 256) $icoPath
+# 3. Web & Desktop Assets (public/favicon.ico)
+$faviconPath = Join-Path $publicDir "favicon.ico"
+CreateIco $srcImg @(16, 24, 32, 48, 64, 128, 256) $faviconPath
 
-# 4. Web Assets
 $distClient = Join-Path $rootDir "dist\client"
 if (Test-Path $distClient) {
-    CreateResizedPng $srcImg 256 256 0.95 (Join-Path $distClient "logo.png")
-    CreateIco $srcImg @(16, 32, 48) (Join-Path $distClient "favicon.ico")
+    Copy-Item $logoPath (Join-Path $distClient "logo.png") -Force
+    Copy-Item $faviconPath (Join-Path $distClient "favicon.ico") -Force
 }
 
-# 5. Base64 icon for Desktop
+# 4. Base64 icon for Desktop
 $desktopAssets = Join-Path $rootDir "src\platform\desktop\assets.ts"
 $temp256 = [System.IO.Path]::GetTempFileName() + ".png"
 CreateResizedPng $srcImg 256 256 0.95 $temp256

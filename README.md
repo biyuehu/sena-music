@@ -1,7 +1,7 @@
 # Sena Music
 
 <p align="center">
-  <img src="./logo.svg" alt="Sena Music" width="128">
+  <img src="./public/logo.png" alt="Sena Music" width="128">
 </p>
 
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](https://github.com/biyuehu/sena-music/blob/master/LICENSE)
@@ -27,7 +27,7 @@
 - Runtime & Package manager: Bun
 - Backend: Romi Framework based monadify types
 - Frontend: TypeScript, lit-html, usignal, UnoCSS
-- Builder: Parcel
+- Builder: Vite
 - Platform: Electron, Capacitor
 - Utils(Optional): ffmpeg, yt-dlp
 
@@ -65,7 +65,7 @@ bun run desktop:dev
 bun run desktop:build
 bun run mobile:sync
 
-# Test & Check：
+# Test & Check
 bun run check
 bun test
 bun run fix
