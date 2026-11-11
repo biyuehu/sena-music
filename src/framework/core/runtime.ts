@@ -29,6 +29,17 @@ export function createApp<State extends object = StrictEmptyObject>(
 ): BanIllegalStateType<State, Server> {
   if (typeof route !== 'object' || typeof options !== 'object') throw new Error(StateTypeParameterCanNotBe)
   return createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range, X-Requested-With')
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges')
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204
+      res.end()
+      return
+    }
+
     const url = req.url ?? ''
     const path = url.split('?')[0]
     const segments = path.split('/').filter(Boolean)

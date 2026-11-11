@@ -75,7 +75,7 @@ export type InferClientRouteToFunction<R extends Record<string, unknown>> = {
 }
 
 export interface ClientOptions {
-  baseUrl: string
+  baseUrl?: string | (() => string)
   fetch?: typeof globalThis.fetch
 }
 
@@ -89,7 +89,8 @@ export function createClient<R extends ClientRoute>(
         return buildProxy([...segments, key])
       },
       async apply(_, __, params) {
-        const base = options.baseUrl ? options.baseUrl.replace(/\/+$/, '') : ''
+        const rawBase = typeof options.baseUrl === 'function' ? options.baseUrl() : (options.baseUrl ?? '')
+        const base = rawBase.replace(/\/+$/, '')
         let url = base ? `${base}/${segments.join('/')}` : `/${segments.join('/')}`
 
         const init: RequestInit = {
