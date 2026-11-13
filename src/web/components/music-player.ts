@@ -1233,16 +1233,25 @@ defineComponent(
         </div>
       </div>
 
-      <div class="flex items-center justify-between relative">
-        <div class="${isFull ? 'hidden' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}" @click=${() => host.actions?.toggleFullscreen()}>
-          ${renderCover(song?.cover, 'w-10 h-10 rounded bg-[var(--lx-main)] object-cover border border-[var(--lx-border)]')}
-          <div class="hidden sm:block min-w-0">
-            <div class="text-sm font-bold truncate">${song?.name ?? '未在播放'}</div>
-            <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song?.artists?.join(' & ') ?? '...'}</div>
-          </div>
+      <div class="flex items-center justify-between relative w-full">
+        <div
+          class="${isFull ? 'flex-1 min-w-0' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}"
+          @click=${() => !isFull && host.actions?.toggleFullscreen()}
+        >
+          ${
+            isFull
+              ? ''
+              : html`
+                  ${renderCover(song?.cover, 'w-10 h-10 rounded bg-[var(--lx-main)] object-cover border border-[var(--lx-border)]')}
+                  <div class="hidden sm:block min-w-0">
+                    <div class="text-sm font-bold truncate">${song?.name ?? '未在播放'}</div>
+                    <div class="text-[10px] text-[var(--lx-text-muted)] truncate">${song?.artists?.join(' & ') ?? '...'}</div>
+                  </div>
+                `
+          }
         </div>
 
-        <div class="flex items-center gap-6">
+        <div class="flex items-center justify-center gap-6 shrink-0">
           <button @click=${() => host.actions?.prev()} title="上一首 (Ctrl+← / [)" class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
           <button @click=${() => host.actions?.toggle()} title="${host.isPlaying ? '暂停 (Space)' : '播放 (Space)'}" class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
             <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
@@ -1250,7 +1259,7 @@ defineComponent(
           <button @click=${() => host.actions?.next()} title="下一首 (Ctrl+→ / ])" class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
         </div>
 
-        <div class="flex items-center justify-end gap-4 ${isFull ? '' : 'w-1/3'}">
+        <div class="flex items-center justify-end gap-4 ${isFull ? 'flex-1 min-w-0' : 'w-1/3'}">
           <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
           
           <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]} (O)" @click=${() => host.actions?.switchMode()}></div>
@@ -1794,8 +1803,8 @@ defineComponent(
         class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-20">
       </button>
 
-      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-12 pb-6 overflow-hidden relative z-10">
-        <div class="flex justify-between items-center shrink-0 py-2 z-20">
+      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-10 pb-6 overflow-hidden relative z-10">
+        <div class="flex justify-between items-center shrink-0 py-1.5 z-20">
           <button
             @click=${() => {
               host.showMobileLyrics = !host.showMobileLyrics
@@ -1811,42 +1820,54 @@ defineComponent(
           ${renderLyricToolbar()}
         </div>
 
-        <div class="flex-1 min-h-0 w-full overflow-hidden relative my-2">
+        <div class="flex-1 min-h-0 w-full overflow-hidden relative my-2 flex flex-col items-center justify-center">
           ${
             host.showMobileLyrics
               ? html`<div class="w-full h-full relative overflow-hidden">${renderLyricContent(true)}</div>`
               : html`
-                <div class="w-full h-full flex flex-col items-center justify-center cursor-pointer" @click=${() => {
+                <div class="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none px-2" @click=${() => {
                   host.showMobileLyrics = true
                   setTimeout(() => host.actions?.scrollToActiveLyric(false), 50)
                 }}>
-                  ${renderCover(song?.cover, 'w-full max-w-[240px] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
+                  ${renderCover(song?.cover, 'w-[min(68vw,280px)] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)] transition-transform active:scale-95')}
+                  <div class="flex flex-col gap-1 text-center mt-5 px-4 max-w-full">
+                    <h1 class="text-xl sm:text-2xl font-black text-[var(--lx-accent)] tracking-tighter truncate" title="${song?.name}">${song?.name ?? '未知曲目'}</h1>
+                    <p class="text-xs sm:text-sm opacity-50 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+                  </div>
                 </div>
               `
           }
         </div>
 
-        <div class="shrink-0 flex flex-col gap-1 text-center py-1 z-20">
-          <h1 class="text-xl font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
-          <p class="text-xs opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
-        </div>
+        ${
+          host.showMobileLyrics
+            ? html`
+              <div class="shrink-0 flex flex-col gap-0.5 text-center py-1 z-20">
+                <h1 class="text-base font-black text-[var(--lx-accent)] tracking-tighter truncate">${song?.name ?? '未知曲目'}</h1>
+                <p class="text-[11px] opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+              </div>
+            `
+            : ''
+        }
 
-        <div class="shrink-0 pt-2 pb-1 z-20">
+        <div class="shrink-0 pt-2 pb-1 z-20 w-full max-w-md mx-auto">
           ${commonControls(true)}
         </div>
       </div>
 
-      <div class="hidden md:flex w-full max-w-6xl h-full max-h-[85vh] px-12 flex-row items-center justify-between gap-16 relative z-10">
-        <div class="flex flex-col gap-8 w-[380px] shrink-0">
-          ${renderCover(song?.cover, 'w-full aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)]')}
-          <div class="flex flex-col gap-1">
-            <h1 class="text-3xl font-black text-[var(--lx-accent)] tracking-tighter truncate" title="${song?.name}">${song?.name ?? '未知曲目'}</h1>
-            <p class="text-lg opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
+      <div class="hidden md:flex w-full max-w-5xl h-full max-h-[85vh] px-8 lg:px-12 flex-row items-center justify-center gap-12 lg:gap-20 relative z-10 mx-auto">
+        <div class="flex flex-col gap-6 w-full max-w-[360px] lg:max-w-[400px] shrink-0 items-center md:items-start text-left">
+          ${renderCover(song?.cover, 'w-full max-w-[360px] lg:max-w-[400px] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)] mx-auto')}
+          <div class="flex flex-col gap-1 w-full">
+            <h1 class="text-2xl lg:text-3xl font-black text-[var(--lx-accent)] tracking-tighter truncate" title="${song?.name}">${song?.name ?? '未知曲目'}</h1>
+            <p class="text-base lg:text-lg opacity-40 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
           </div>
-          ${commonControls(true)}
+          <div class="w-full">
+            ${commonControls(true)}
+          </div>
         </div>
 
-        <div class="flex-1 h-full min-w-0 flex flex-col pb-10">
+        <div class="flex-1 max-w-[480px] lg:max-w-[540px] h-full min-w-0 flex flex-col pb-8">
           <div class="flex-none flex justify-end items-center pb-4 border-b border-[var(--lx-border)]/50">
             ${renderLyricToolbar()}
           </div>

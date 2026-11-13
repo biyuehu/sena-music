@@ -492,7 +492,17 @@ export const editSongModal = defineComponent(
                                   </span>
                                 </div>
                                 <div class="flex items-center flex-wrap gap-2 text-[11px] opacity-65">
-                                  <span class="font-mono text-[11px] select-all">${item.bvid}</span>
+                                  <a
+                                    href="https://www.bilibili.com/video/${item.bvid}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    @click=${(e: MouseEvent) => e.stopPropagation()}
+                                    title="在 B站 打开原视频"
+                                    class="font-mono text-[11px] hover:text-[var(--lx-accent)] hover:underline flex items-center gap-0.5 select-all"
+                                  >
+                                    <span>${item.bvid}</span>
+                                    <span class="i-carbon-launch text-[10px]"></span>
+                                  </a>
                                   <span>·</span>
                                   <span class="truncate max-w-[120px]">${item.author}</span>
                                   <span>·</span>
@@ -504,7 +514,7 @@ export const editSongModal = defineComponent(
                                 class="flex-none px-2.5 py-1 text-xs rounded transition-all ${
                                   isCurrent
                                     ? 'border border-[var(--lx-accent)] text-[var(--lx-accent)] font-medium bg-transparent flex items-center gap-1 cursor-default'
-                                    : 'bg-[var(--lx-accent)] text-white opacity-85 group-hover:opacity-100'
+                                    : 'bg-[var(--lx-accent)] text-white opacity-85 group-hover:opacity-100 cursor-pointer'
                                 }"
                               >
                                 ${isCurrent ? html`<span class="i-carbon-checkmark text-xs"></span>已选用` : '选用'}

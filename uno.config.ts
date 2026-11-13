@@ -4,13 +4,12 @@ import { extractorArbitraryVariants } from '@unocss/extractor-arbitrary-variants
 import { defineConfig, presetIcons, presetWind3 } from 'unocss'
 
 export default defineConfig({
-  cli: {
-    entry: {
-      patterns: ['**/*.{html,ts}', '**/music-player.ts'],
-      outFile: resolve(__dirname, 'src/web/views/uno.css')
-    }
+  content: {
+    pipeline: {
+      include: [/\.(vue|svelte|[jt]sx?|mdx?|astro|elm|php|phtml|html)($|\?)/, 'src/**/*.{html,ts}']
+    },
+    filesystem: [resolve(import.meta.dirname, 'src/**/*.{html,ts}').replace(/\\/g, '/')]
   },
-  content: { filesystem: ['src/**/*.{html,ts}'] },
   presets: [
     presetWind3(),
     presetIcons({
