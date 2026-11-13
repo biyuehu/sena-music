@@ -195,7 +195,7 @@ export const AboutPage = defineComponent(
                   </div>
                 </div>
 
-                <div class="text-center text-xs text-[var(--lx-text-muted)] py-4 opacity-70">
+                <div class="text-center text-xs text-[var(--lx-text-muted)] opacity-70">
                   <p>SenaMusic © 2026 Arimura Romi.</p>
                 </div>
               </div>

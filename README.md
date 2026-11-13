@@ -36,7 +36,7 @@
 在程序同级目录或运行根目录创建或编辑 `music.toml`：
 
 ```toml
-port = 3000
+port = 6120
 dataDirectory = "data"
 playlistId = 123456789 # Netease music playlist id
 cacheDirectory = "cache"

@@ -14,7 +14,7 @@ const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 export const DEFAULT_CONFIG: Config = {
-  port: 3000,
+  port: 6120,
   dataDirectory: 'data',
   playlistId: 2653919517,
   cacheDirectory: 'cache',
