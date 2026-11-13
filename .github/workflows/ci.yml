@@ -93,7 +93,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/*.7z
 
   android:
     needs: build

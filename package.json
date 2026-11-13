@@ -65,7 +65,7 @@
   },
   "build": {
     "appId": "com.himenosena.music",
-    "productName": "SenaMusic",
+    "productName": "Sena Music",
     "directories": {
       "output": "release"
     },
@@ -88,9 +88,37 @@
       }
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "7z",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "public/favicon.ico",
       "legalTrademarks": "Sena Music"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName} Portable ${version}.${ext}"
     }
   },
   "electronmon": {
