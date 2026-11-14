@@ -340,11 +340,11 @@ defineComponent(
                         <span class="text-xs font-bold opacity-70">额外请求地址（可选）</span>
                         <input
                           type="text"
-                          placeholder="http://localhost:2000"
+                          placeholder="http://localhost:6120"
                           .value=${host.apiBaseUrl}
                           @input=${(e: Event) => (host.apiBaseUrl = (e.target as HTMLInputElement).value)}
                         />
-                        <span class="text-[11px] opacity-40">留空则使用当前站点地址，修改后需刷新页面生效</span>
+                        <span class="text-[11px] opacity-40">留空在移动端默认连接 http://localhost:6120，修改后保存生效</span>
                       </label>
 
                       <button

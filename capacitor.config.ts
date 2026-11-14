@@ -4,5 +4,8 @@ export default {
   appId: 'com.himenosena.music',
   appName: '星之声音乐',
   webDir: 'dist/client',
-  server: { cleartext: true }
+  server: {
+    cleartext: true,
+    androidScheme: 'http'
+  }
 } satisfies CapacitorConfig

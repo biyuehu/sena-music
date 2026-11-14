@@ -1,10 +1,11 @@
+import { Capacitor } from '@capacitor/core'
 import { type Either, Right } from '@/romi/utils/adt/either'
 import type { SongInfo } from '../../common/types'
 import { Storage } from './storage'
 
 export async function getSongUrl(song: SongInfo): Promise<Either<string, string>> {
   const base = Storage.get<string>('api-base-url')
-    .unwrapOrElse(() => '')
+    .unwrapOrElse(() => (Capacitor.isNativePlatform() ? 'http://localhost:6120' : ''))
     .replace(/\/+$/, '')
   switch (song.type) {
     case 'netease':
