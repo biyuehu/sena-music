@@ -27,11 +27,12 @@ export interface BiliVideoInfo {
 export namespace BiliFetcher {
   const DEFAULT_USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+  const MOBILE_USER_AGENT =
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36'
   const BILIBILI_REFERER = 'https://www.bilibili.com/'
   const COMMON_HEADERS = {
     'User-Agent': DEFAULT_USER_AGENT,
     Referer: BILIBILI_REFERER,
-    Origin: 'https://www.bilibili.com',
     Accept: 'application/json, text/plain, */*',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Accept-Encoding': 'gzip, deflate, br',
@@ -137,23 +138,43 @@ export namespace BiliFetcher {
   }
 
   async function getVideoInfoFromHtml(bvid?: string, aid?: number, page = 1): Promise<Maybe<BiliVideoInfo>> {
+    const target = bvid || (aid ? `av${aid}` : '')
+    if (!target) return Nothing()
+
+    const cookie = getCookieHeader()
+    let html = ''
     try {
-      const targetUrl = `https://www.bilibili.com/video/${bvid || `av${aid}`}`
-      const res = await fetch(targetUrl, {
+      let res = await fetch(`https://www.bilibili.com/video/${target}`, {
         headers: {
           'User-Agent': DEFAULT_USER_AGENT,
-          Referer: 'https://www.bilibili.com/',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          Referer: BILIBILI_REFERER,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          ...(cookie ? { Cookie: cookie } : {})
         }
       })
+      if (!res.ok || res.status === 412) {
+        res = await fetch(`https://m.bilibili.com/video/${target}`, {
+          headers: {
+            'User-Agent': MOBILE_USER_AGENT,
+            Referer: BILIBILI_REFERER,
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        })
+      }
       if (!res.ok) {
-        logger.warn(`Bilibili video page returned HTTP ${res.status} for ${targetUrl}`)
+        logger.warn(`Bilibili video page returned HTTP ${res.status} for ${target}`)
         return Nothing()
       }
-      const html = await res.text()
+      html = await res.text()
+    } catch (err) {
+      logger.warn('Failed to fetch Bilibili video HTML:', err)
+      return Nothing()
+    }
+
+    try {
       const match = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{.+?\});/)
       if (!match?.[1]) {
-        logger.warn(`Could not find __INITIAL_STATE__ in Bilibili video page for ${targetUrl}`)
+        logger.warn(`Could not find __INITIAL_STATE__ in Bilibili video page for ${target}`)
         return Nothing()
       }
       const parsed = JSON.parse(match[1]) as {
@@ -167,8 +188,28 @@ export namespace BiliFetcher {
           owner?: { name: string }
           pages?: Array<{ cid: number; page: number; part: string; duration: number }>
         }
+        video?: {
+          bvid?: string
+          viewInfo?: {
+            aid: number
+            cid: number
+            title: string
+            pic: string
+            duration: number
+            pages?: Array<{ cid: number; page: number; part: string; duration: number }>
+          }
+          upInfo?: { card?: { name?: string } }
+        }
       }
-      const data = parsed.videoData
+      const data =
+        parsed.videoData ??
+        (parsed.video?.viewInfo
+          ? {
+              ...parsed.video.viewInfo,
+              bvid: parsed.video.bvid ?? bvid ?? '',
+              owner: { name: parsed.video.upInfo?.card?.name }
+            }
+          : undefined)
       if (!data) return Nothing()
 
       const pages = data.pages || []
@@ -177,13 +218,13 @@ export namespace BiliFetcher {
 
       return Just({
         bvid: data.bvid,
-        aid: data.aid,
+        aid: data.aid ?? 0,
         cid: targetPage.cid,
-        title: data.title,
-        cover: data.pic,
+        title: data.title ?? '',
+        cover: data.pic ?? '',
         artist: data.owner?.name || 'Bilibili',
-        duration: targetPage.duration || data.duration,
-        partName: targetPage.part || data.title,
+        duration: targetPage.duration || data.duration || 0,
+        partName: targetPage.part || data.title || '',
         page: targetPage.page || 1
       })
     } catch (err) {
@@ -203,9 +244,15 @@ export namespace BiliFetcher {
     const cookie = getCookieHeader()
 
     try {
-      const res = await fetch(`https://api.bilibili.com/x/web-interface/view?${query}`, {
+      let res = await fetch(`https://api.bilibili.com/x/web-interface/view/detail?${query}`, {
         headers: { ...COMMON_HEADERS, ...(cookie ? { Cookie: cookie } : {}) }
       })
+
+      if (!res.ok || res.status === 412) {
+        res = await fetch(`https://api.bilibili.com/x/web-interface/view?${query}`, {
+          headers: { ...COMMON_HEADERS, ...(cookie ? { Cookie: cookie } : {}) }
+        })
+      }
 
       if (!res.ok) {
         logger.warn(`Bilibili view API returned HTTP ${res.status}: ${res.statusText}, trying HTML fallback...`)
@@ -217,12 +264,22 @@ export namespace BiliFetcher {
         code: number
         message?: string
         data?: {
-          bvid: string
-          aid: number
-          cid: number
-          title: string
-          pic: string
-          duration: number
+          View?: {
+            bvid: string
+            aid: number
+            cid: number
+            title: string
+            pic: string
+            duration: number
+            owner?: { name: string }
+            pages?: Array<{ cid: number; page: number; part: string; duration: number }>
+          }
+          bvid?: string
+          aid?: number
+          cid?: number
+          title?: string
+          pic?: string
+          duration?: number
           owner?: { name: string }
           pages?: Array<{ cid: number; page: number; part: string; duration: number }>
         }
@@ -234,27 +291,27 @@ export namespace BiliFetcher {
         return getVideoInfoFromHtml(bvid, aid, page)
       }
 
-      if (json.code !== 0 || !json.data) {
+      const data = json.data?.View ?? json.data
+      if (json.code !== 0 || !data || !data.bvid || !data.cid) {
         logger.warn(
           `Bilibili view API error: [code ${json.code}] ${json.message || 'Unknown error'}, trying HTML fallback...`
         )
         return getVideoInfoFromHtml(bvid, aid, page)
       }
 
-      const data = json.data
       const pages = data.pages || []
       const targetPage = pages.find((p) => p.page === page) ??
         pages[0] ?? { cid: data.cid, page: 1, part: data.title, duration: data.duration }
 
       return Just({
         bvid: data.bvid,
-        aid: data.aid,
+        aid: data.aid ?? 0,
         cid: targetPage.cid,
-        title: data.title,
-        cover: data.pic,
+        title: data.title ?? '',
+        cover: data.pic ?? '',
         artist: data.owner?.name || 'Bilibili',
-        duration: targetPage.duration || data.duration,
-        partName: targetPage.part || data.title,
+        duration: targetPage.duration || data.duration || 0,
+        partName: targetPage.part || data.title || '',
         page: targetPage.page || 1
       })
     } catch (err) {
