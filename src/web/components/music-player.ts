@@ -1233,14 +1233,14 @@ defineComponent(
         </div>
       </div>
 
-      <div class="flex items-center justify-between relative w-full">
+      <div class="${isFull ? 'grid grid-cols-3 items-center w-full' : 'flex items-center justify-between relative w-full'}">
         <div
-          class="${isFull ? 'flex-1 min-w-0' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}"
+          class="${isFull ? 'flex items-center justify-start min-w-0 pl-1' : 'flex items-center gap-3 w-1/3 min-w-0 cursor-pointer'}"
           @click=${() => !isFull && host.actions?.toggleFullscreen()}
         >
           ${
             isFull
-              ? ''
+              ? html`<div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]} (O)" @click=${() => host.actions?.switchMode()}></div>`
               : html`
                   ${renderCover(song?.cover, 'w-10 h-10 rounded bg-[var(--lx-main)] object-cover border border-[var(--lx-border)]')}
                   <div class="hidden sm:block min-w-0">
@@ -1251,7 +1251,7 @@ defineComponent(
           }
         </div>
 
-        <div class="flex items-center justify-center gap-6 shrink-0">
+        <div class="flex items-center justify-center gap-5 sm:gap-6">
           <button @click=${() => host.actions?.prev()} title="上一首 (Ctrl+← / [)" class="i-carbon-skip-back-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
           <button @click=${() => host.actions?.toggle()} title="${host.isPlaying ? '暂停 (Space)' : '播放 (Space)'}" class="w-12 h-12 rounded-full bg-[var(--lx-accent)] text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
             <div class="${host.isPlaying ? 'i-carbon-pause-filled' : 'i-carbon-play-filled-alt'} text-2xl"></div>
@@ -1259,10 +1259,10 @@ defineComponent(
           <button @click=${() => host.actions?.next()} title="下一首 (Ctrl+→ / ])" class="i-carbon-skip-forward-filled text-xl hover:text-[var(--lx-accent)] transition-colors"></button>
         </div>
 
-        <div class="flex items-center justify-end gap-4 ${isFull ? 'flex-1 min-w-0' : 'w-1/3'}">
-          <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
+        <div class="${isFull ? 'flex items-center justify-end gap-3 min-w-0 pr-1' : 'flex items-center justify-end gap-4 w-1/3'}">
+          <span class="${host.isFullscreen ? '' : 'hidden sm:block'} font-mono text-xs sm:text-md opacity-40">${host.currentTime} <span class="hidden md:inline">/ ${host.duration}</span></span>
           
-          <div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]} (O)" @click=${() => host.actions?.switchMode()}></div>
+          ${!isFull ? html`<div class="${modeIcons[host.playMode]} text-lg cursor-pointer hover:opacity-100 opacity-40" title="${modeTitles[host.playMode]} (O)" @click=${() => host.actions?.switchMode()}></div>` : ''}
 
           <div class="relative flex items-center">
             <div class="absolute bottom-full right-0 mb-10 px-4 py-3 bg-[var(--lx-bg-alt)] border border-[var(--lx-border)] rounded-2xl shadow-2xl transition-all duration-200 origin-bottom-right hover:bg-[var(--lx-bg-alt)]
@@ -1410,7 +1410,7 @@ defineComponent(
         return html`
           <div class="relative w-full h-full overflow-hidden flex flex-col">
             <div 
-              class="lyric-scroll-container flex-1 overflow-y-auto no-scrollbar scroll-smooth space-y-6 pt-[35%] pb-[45%] px-2 select-none text-left"
+              class="lyric-scroll-container flex-1 overflow-y-auto no-scrollbar scroll-smooth space-y-6 pt-[35%] pb-[45%] px-2 select-none ${isMobile ? 'text-center' : 'text-left'}"
               style="mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 85%, transparent 100%);"
               @wheel=${() => host.actions?.handleLyricScroll()}
               @touchmove=${() => host.actions?.handleLyricScroll()}
@@ -1428,10 +1428,10 @@ defineComponent(
                     }}
                     class="cursor-pointer transition-all duration-300 transform group ${
                       isActive
-                        ? 'scale-105 opacity-100 font-bold origin-left'
+                        ? `scale-105 opacity-100 font-bold ${isMobile ? 'origin-center' : 'origin-left'}`
                         : isPast
-                          ? 'opacity-35 hover:opacity-75 scale-95 origin-left'
-                          : 'opacity-35 hover:opacity-75 origin-left'
+                          ? `opacity-35 hover:opacity-75 scale-95 ${isMobile ? 'origin-center' : 'origin-left'}`
+                          : `opacity-35 hover:opacity-75 ${isMobile ? 'origin-center' : 'origin-left'}`
                     }"
                   >
                     ${
@@ -1803,7 +1803,7 @@ defineComponent(
         class="absolute top-5 left-5 i-carbon-chevron-down text-3xl opacity-40 hover:opacity-100 hover:text-[var(--lx-accent)] z-20">
       </button>
 
-      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-10 pb-6 overflow-hidden relative z-10">
+      <div class="flex flex-col md:hidden w-full h-full max-h-[100dvh] px-6 pt-14 pb-6 overflow-hidden relative z-10 justify-between">
         <div class="flex justify-between items-center shrink-0 py-1.5 z-20">
           <button
             @click=${() => {
@@ -1820,17 +1820,17 @@ defineComponent(
           ${renderLyricToolbar()}
         </div>
 
-        <div class="flex-1 min-h-0 w-full overflow-hidden relative my-2 flex flex-col items-center justify-center">
+        <div class="flex-1 min-h-0 w-full overflow-hidden relative my-auto flex flex-col items-center justify-center">
           ${
             host.showMobileLyrics
               ? html`<div class="w-full h-full relative overflow-hidden">${renderLyricContent(true)}</div>`
               : html`
-                <div class="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none px-2" @click=${() => {
+                <div class="w-full flex flex-col items-center justify-center cursor-pointer select-none px-2 my-auto" @click=${() => {
                   host.showMobileLyrics = true
                   setTimeout(() => host.actions?.scrollToActiveLyric(false), 50)
                 }}>
-                  ${renderCover(song?.cover, 'w-[min(68vw,280px)] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)] transition-transform active:scale-95')}
-                  <div class="flex flex-col gap-1 text-center mt-5 px-4 max-w-full">
+                  ${renderCover(song?.cover, 'w-[min(66vw,260px)] aspect-square rounded-2xl shadow-2xl object-cover border border-[var(--lx-border)] transition-transform active:scale-95 mx-auto')}
+                  <div class="flex flex-col gap-1.5 text-center mt-6 px-4 max-w-full">
                     <h1 class="text-xl sm:text-2xl font-black text-[var(--lx-accent)] tracking-tighter truncate" title="${song?.name}">${song?.name ?? '未知曲目'}</h1>
                     <p class="text-xs sm:text-sm opacity-50 font-medium truncate">${song?.artists?.join(', ') ?? '未知艺术家'}</p>
                   </div>
