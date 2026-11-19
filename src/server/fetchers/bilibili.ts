@@ -27,8 +27,6 @@ export interface BiliVideoInfo {
 export namespace BiliFetcher {
   const DEFAULT_USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-  const MOBILE_USER_AGENT =
-    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36'
   const BILIBILI_REFERER = 'https://www.bilibili.com/'
   const COMMON_HEADERS = {
     'User-Agent': DEFAULT_USER_AGENT,
@@ -36,7 +34,47 @@ export namespace BiliFetcher {
     Accept: 'application/json, text/plain, */*',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     'Accept-Encoding': 'gzip, deflate, br',
+    'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
     Connection: 'keep-alive'
+  }
+  const DESKTOP_HTML_HEADERS = {
+    ...COMMON_HEADERS,
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-site': 'none',
+    'sec-fetch-user': '?1',
+    'upgrade-insecure-requests': '1'
+  }
+
+  let visitorCookieCache = ''
+  let visitorCookieExpire = 0
+
+  async function getVisitorCookie(): Promise<string> {
+    if (visitorCookieCache && Date.now() < visitorCookieExpire) return visitorCookieCache
+    try {
+      const res = await fetch('https://api.bilibili.com/x/frontend/finger/spi', { headers: COMMON_HEADERS })
+      if (!res.ok) return ''
+      const json = (await res.json()) as { code: number; data?: { b_3?: string; b_4?: string } }
+      if (json.code === 0 && json.data?.b_3) {
+        visitorCookieCache = `buvid3=${json.data.b_3}; buvid4=${json.data.b_4 ?? ''}`
+        visitorCookieExpire = Date.now() + 24 * 3600 * 1000
+        return visitorCookieCache
+      }
+    } catch {
+      return ''
+    }
+    return ''
+  }
+
+  async function getEffectiveCookieHeader(): Promise<string> {
+    const userCookie = getCookieHeader()
+    return userCookie || (await getVisitorCookie())
   }
 
   const MIXIN_KEY_ENC_TAB = [
@@ -141,26 +179,15 @@ export namespace BiliFetcher {
     const target = bvid || (aid ? `av${aid}` : '')
     if (!target) return Nothing()
 
-    const cookie = getCookieHeader()
+    const cookie = await getEffectiveCookieHeader()
     let html = ''
     try {
-      let res = await fetch(`https://www.bilibili.com/video/${target}`, {
+      const res = await fetch(`https://www.bilibili.com/video/${target}`, {
         headers: {
-          'User-Agent': DEFAULT_USER_AGENT,
-          Referer: BILIBILI_REFERER,
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          ...DESKTOP_HTML_HEADERS,
           ...(cookie ? { Cookie: cookie } : {})
         }
       })
-      if (!res.ok || res.status === 412) {
-        res = await fetch(`https://m.bilibili.com/video/${target}`, {
-          headers: {
-            'User-Agent': MOBILE_USER_AGENT,
-            Referer: BILIBILI_REFERER,
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-          }
-        })
-      }
       if (!res.ok) {
         logger.warn(`Bilibili video page returned HTTP ${res.status} for ${target}`)
         return Nothing()
@@ -178,24 +205,27 @@ export namespace BiliFetcher {
         return Nothing()
       }
       const parsed = JSON.parse(match[1]) as {
+        cid?: number
         videoData?: {
-          bvid: string
-          aid: number
-          cid: number
-          title: string
-          pic: string
-          duration: number
-          owner?: { name: string }
+          bvid?: string
+          aid?: number
+          cid?: number
+          title?: string
+          pic?: string
+          duration?: number
+          owner?: { name?: string }
           pages?: Array<{ cid: number; page: number; part: string; duration: number }>
         }
         video?: {
           bvid?: string
           viewInfo?: {
-            aid: number
-            cid: number
-            title: string
-            pic: string
-            duration: number
+            bvid?: string
+            aid?: number
+            cid?: number
+            title?: string
+            pic?: string
+            duration?: number
+            owner?: { name?: string }
             pages?: Array<{ cid: number; page: number; part: string; duration: number }>
           }
           upInfo?: { card?: { name?: string } }
@@ -206,26 +236,30 @@ export namespace BiliFetcher {
         (parsed.video?.viewInfo
           ? {
               ...parsed.video.viewInfo,
-              bvid: parsed.video.bvid ?? bvid ?? '',
-              owner: { name: parsed.video.upInfo?.card?.name }
+              bvid: parsed.video.bvid ?? parsed.video.viewInfo.bvid ?? bvid ?? '',
+              owner: { name: parsed.video.viewInfo.owner?.name ?? parsed.video.upInfo?.card?.name }
             }
-          : undefined)
+          : void 0)
       if (!data) return Nothing()
 
-      const pages = data.pages || []
-      const targetPage = pages.find((p) => p.page === page) ??
-        pages[0] ?? { cid: data.cid, page: 1, part: data.title, duration: data.duration }
+      const pages = data.pages ?? parsed.videoData?.pages ?? parsed.video?.viewInfo?.pages ?? []
+      const targetPage = pages.find((p) => p.page === page) ?? pages[0]
+      const finalCid = targetPage?.cid ?? data.cid ?? parsed.cid
+      if (!finalCid) {
+        logger.warn(`Could not extract valid cid from HTML for ${target}`)
+        return Nothing()
+      }
 
       return Just({
-        bvid: data.bvid,
-        aid: data.aid ?? 0,
-        cid: targetPage.cid,
+        bvid: data.bvid ?? bvid ?? '',
+        aid: data.aid ?? aid ?? 0,
+        cid: finalCid,
         title: data.title ?? '',
         cover: data.pic ?? '',
         artist: data.owner?.name || 'Bilibili',
-        duration: targetPage.duration || data.duration || 0,
-        partName: targetPage.part || data.title || '',
-        page: targetPage.page || 1
+        duration: targetPage?.duration ?? data.duration ?? 0,
+        partName: targetPage?.part ?? data.title ?? '',
+        page: targetPage?.page ?? page ?? 1
       })
     } catch (err) {
       logger.warn('Failed to parse Bilibili video info from HTML fallback:', err)
@@ -241,7 +275,7 @@ export namespace BiliFetcher {
     }
 
     const query = bvid ? `bvid=${bvid}` : `aid=${aid}`
-    const cookie = getCookieHeader()
+    const cookie = await getEffectiveCookieHeader()
 
     try {
       let res = await fetch(`https://api.bilibili.com/x/web-interface/view/detail?${query}`, {
@@ -321,7 +355,7 @@ export namespace BiliFetcher {
   }
 
   async function fetchAudioDirectUrl(info: BiliVideoInfo): Promise<Maybe<string>> {
-    const cookie = getCookieHeader()
+    const cookie = await getEffectiveCookieHeader()
 
     try {
       const mixinKey = await getWbiMixinKey(cookie)
@@ -582,7 +616,7 @@ export namespace BiliFetcher {
     const cleanKeyword = keyword.trim()
     if (!cleanKeyword) return Just([])
 
-    const cookie = getCookieHeader()
+    const cookie = await getEffectiveCookieHeader()
     let mixinKey: string
     try {
       mixinKey = await getWbiMixinKey(cookie)
