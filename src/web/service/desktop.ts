@@ -8,6 +8,44 @@ export interface DesktopShortcut {
   enabled: boolean
 }
 
+export interface DesktopLyricSettings {
+  enabled: boolean
+  locked: boolean
+  fontSize: number
+  fontFamily: string
+  color: string
+  playedColor: string
+  strokeWidth: number
+  strokeColor: string
+  shadowBlur: number
+  shadowColor: string
+  backgroundColor: string
+  borderColor: string
+  borderWidth: number
+  width: number
+  height: number
+  x?: number
+  y?: number
+}
+
+export const DEFAULT_DESKTOP_LYRIC_SETTINGS: DesktopLyricSettings = {
+  enabled: false,
+  locked: false,
+  fontSize: 28,
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+  color: '#ffffff',
+  playedColor: '#38bdf8',
+  strokeWidth: 2,
+  strokeColor: '#000000',
+  shadowBlur: 6,
+  shadowColor: 'rgba(0, 0, 0, 0.85)',
+  backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  borderColor: 'rgba(255, 255, 255, 0.15)',
+  borderWidth: 1,
+  width: 800,
+  height: 130
+}
+
 export const DEFAULT_DESKTOP_SHORTCUTS: DesktopShortcut[] = [
   {
     id: 'toggle',
@@ -57,6 +95,32 @@ export interface SenaDesktopBridge {
   syncPlaybackState: (state: { isPlaying: boolean; title?: string; artist?: string }) => void
   onPlayerCommand: (callback: (command: string) => void) => () => void
   onCloseActionChanged?: (callback: (action: CloseAction) => void) => () => void
+  getLyricSettings?: () => Promise<DesktopLyricSettings>
+  setLyricSettings?: (settings: Partial<DesktopLyricSettings>) => Promise<DesktopLyricSettings>
+  syncLyric?: (data: {
+    tracks?: string[]
+    text: string
+    translation?: string
+    subText?: string
+    isPlaying: boolean
+    title?: string
+    artist?: string
+  }) => void
+  onLyricUpdate?: (
+    callback: (data: {
+      tracks?: string[]
+      text: string
+      translation?: string
+      subText?: string
+      isPlaying: boolean
+      title?: string
+      artist?: string
+    }) => void
+  ) => () => void
+  onLyricSettingsUpdate?: (callback: (settings: DesktopLyricSettings) => void) => () => void
+  sendPlayerCommand?: (command: string) => void
+  moveLyricWindow?: (dx: number, dy: number) => void
+  onLyricResizing?: (callback: () => void) => () => void
 }
 
 declare global {

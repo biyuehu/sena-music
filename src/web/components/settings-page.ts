@@ -6,7 +6,9 @@ import type { Settings } from '../../common/types'
 import { httpClient } from '../service/client'
 import {
   type CloseAction,
+  DEFAULT_DESKTOP_LYRIC_SETTINGS,
   DEFAULT_DESKTOP_SHORTCUTS,
+  type DesktopLyricSettings,
   type DesktopShortcut,
   getDesktopBridge,
   isDesktopApp
@@ -49,6 +51,7 @@ defineComponent(
     isDesktop: State(isDesktopApp()),
     closeAction: State<CloseAction>('ask'),
     desktopShortcuts: State<DesktopShortcut[]>(isDesktopApp() ? [...DEFAULT_DESKTOP_SHORTCUTS] : []),
+    desktopLyricSettings: State<DesktopLyricSettings>(DEFAULT_DESKTOP_LYRIC_SETTINGS),
     recordingActionId: State<string | null>(null)
   },
   {
@@ -173,6 +176,12 @@ defineComponent(
             })
             bridge.onCloseActionChanged?.((action) => {
               host.closeAction = action
+            })
+            bridge.getLyricSettings?.().then((s) => {
+              if (s) host.desktopLyricSettings = s
+            })
+            bridge.onLyricSettingsUpdate?.((s) => {
+              if (s) host.desktopLyricSettings = s
             })
           }
         }
@@ -300,6 +309,24 @@ defineComponent(
         label: c.name,
         color: host.isDark ? c.dark : c.light
       }))
+
+      const updateLyricSetting = async (partial: Partial<DesktopLyricSettings>): Promise<void> => {
+        host.desktopLyricSettings = { ...host.desktopLyricSettings, ...partial }
+        const bridge = getDesktopBridge()
+        if (bridge?.setLyricSettings) {
+          const res = await bridge.setLyricSettings(partial)
+          if (res) host.desktopLyricSettings = res
+        }
+      }
+
+      const fontOptions = [
+        { value: 'system-ui, -apple-system, sans-serif', label: '系统默认' },
+        { value: '"Microsoft YaHei", sans-serif', label: '微软雅黑' },
+        { value: '"Source Han Sans CN", "Noto Sans SC", sans-serif', label: '思源黑体' },
+        { value: '"PingFang SC", "STHeiti", sans-serif', label: '苹方 / 华文黑体' },
+        { value: '"STKaiti", "KaiTi", serif', label: '楷体' },
+        { value: 'custom', label: '自定义字体...' }
+      ]
 
       return html`
         <div class="flex flex-col flex-1 h-full min-h-0 bg-[var(--lx-main)] text-[var(--lx-text)] font-sans overflow-hidden">
@@ -674,6 +701,249 @@ defineComponent(
                                     </div>
                                   `
                                 })}
+                              </div>
+                            </div>
+
+                            <div class="flex flex-col gap-3 mt-3 pt-3 border-t border-[var(--lx-border)]">
+                              <div class="flex items-center justify-between">
+                                <div class="flex flex-col gap-0.5">
+                                  <span class="text-xs font-bold opacity-70">桌面歌词</span>
+                                  <span class="text-[11px] opacity-40">浮动在桌面上的半透明置顶歌词，支持鼠标穿透锁定与样式自定义</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  class="text-xs px-2.5 py-1 rounded bg-[var(--lx-bg-alt)] hover:bg-[var(--lx-hover)] border border-[var(--lx-border)] text-[var(--lx-text)] transition-colors cursor-pointer"
+                                  @click=${() => updateLyricSetting(DEFAULT_DESKTOP_LYRIC_SETTINGS)}
+                                >
+                                  恢复默认
+                                </button>
+                              </div>
+
+                              <div class="flex flex-col gap-2.5 bg-[var(--lx-bg-alt)] p-3.5 rounded-lg border border-[var(--lx-border)]">
+                                <div class="flex items-center justify-between">
+                                  <span class="text-xs font-semibold">开启桌面歌词</span>
+                                  <input
+                                    type="checkbox"
+                                    class="w-4 h-4 cursor-pointer accent-[var(--lx-accent)]"
+                                    .checked=${host.desktopLyricSettings.enabled}
+                                    @change=${(e: Event) => updateLyricSetting({ enabled: (e.target as HTMLInputElement).checked })}
+                                  />
+                                </div>
+
+                                <div class="flex items-center justify-between">
+                                  <div class="flex flex-col">
+                                    <span class="text-xs font-semibold">锁定桌面歌词</span>
+                                    <span class="text-[10px] opacity-50">锁定后鼠标点击直接穿透到下层程序，避免影响游戏或日常操作</span>
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    class="w-4 h-4 cursor-pointer accent-[var(--lx-accent)]"
+                                    .checked=${host.desktopLyricSettings.locked}
+                                    @change=${(e: Event) => updateLyricSetting({ locked: (e.target as HTMLInputElement).checked })}
+                                  />
+                                </div>
+
+                                <div class="flex flex-col gap-1.5 pt-1 border-t border-[var(--lx-border)]">
+                                  <div class="flex justify-between items-center">
+                                    <span class="text-xs font-semibold">字体</span>
+                                    <select
+                                      class="text-xs py-1 px-2 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] text-[var(--lx-text)]"
+                                      @change=${(e: Event) => {
+                                        const val = (e.target as HTMLSelectElement).value
+                                        if (val !== 'custom') updateLyricSetting({ fontFamily: val })
+                                      }}
+                                    >
+                                      ${fontOptions.map(
+                                        (f) =>
+                                          html`<option
+                                            value=${f.value}
+                                            ?selected=${f.value !== 'custom' ? host.desktopLyricSettings.fontFamily === f.value : !fontOptions.slice(0, 5).some((o) => o.value === host.desktopLyricSettings.fontFamily)}
+                                          >
+                                            ${f.label}
+                                          </option>`
+                                      )}
+                                    </select>
+                                  </div>
+                                  ${
+                                    !fontOptions
+                                      .slice(0, 5)
+                                      .some((o) => o.value === host.desktopLyricSettings.fontFamily)
+                                      ? html`
+                                        <input
+                                          type="text"
+                                          class="text-xs py-1 px-2 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] text-[var(--lx-text)]"
+                                          placeholder="请输入自定义字体名称，如 Consolas, 'Fira Code' 等"
+                                          .value=${host.desktopLyricSettings.fontFamily}
+                                          @change=${(e: Event) => updateLyricSetting({ fontFamily: (e.target as HTMLInputElement).value.trim() })}
+                                        />
+                                      `
+                                      : ''
+                                  }
+                                </div>
+
+                                <div class="flex flex-col gap-1.5 pt-1">
+                                  <div class="flex justify-between items-center text-xs">
+                                    <span class="font-semibold">字号大小</span>
+                                    <span class="font-mono text-[var(--lx-accent)] font-bold">${host.desktopLyricSettings.fontSize}px</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="18"
+                                    max="56"
+                                    step="1"
+                                    class="w-full h-1.5 bg-[var(--lx-border)] rounded-lg appearance-none cursor-pointer accent-[var(--lx-accent)]"
+                                    .value=${host.desktopLyricSettings.fontSize.toString()}
+                                    @input=${(e: Event) => updateLyricSetting({ fontSize: Number((e.target as HTMLInputElement).value) })}
+                                  />
+                                </div>
+
+                                <div class="flex flex-col gap-1 pt-1">
+                                  <span class="text-[11px] font-semibold opacity-80">歌词文字颜色</span>
+                                  <div class="flex items-center gap-2">
+                                    <input
+                                      type="color"
+                                      class="w-7 h-7 rounded border border-[var(--lx-border)] cursor-pointer bg-transparent"
+                                      .value=${host.desktopLyricSettings.color}
+                                      @input=${(e: Event) => updateLyricSetting({ color: (e.target as HTMLInputElement).value })}
+                                    />
+                                    <span class="text-xs font-mono opacity-60">${host.desktopLyricSettings.color}</span>
+                                  </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--lx-border)]">
+                                  <div class="flex flex-col gap-1">
+                                    <div class="flex justify-between items-center text-xs">
+                                      <span class="font-semibold">文字描边粗细</span>
+                                      <span class="font-mono text-[var(--lx-accent)] font-bold">${host.desktopLyricSettings.strokeWidth}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="8"
+                                      step="0.5"
+                                      class="w-full h-1.5 bg-[var(--lx-border)] rounded-lg appearance-none cursor-pointer accent-[var(--lx-accent)]"
+                                      .value=${host.desktopLyricSettings.strokeWidth.toString()}
+                                      @input=${(e: Event) => updateLyricSetting({ strokeWidth: Number((e.target as HTMLInputElement).value) })}
+                                    />
+                                  </div>
+                                  <div class="flex flex-col gap-1">
+                                    <span class="text-[11px] font-semibold opacity-80">文字描边颜色</span>
+                                    <div class="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        class="w-7 h-7 rounded border border-[var(--lx-border)] cursor-pointer bg-transparent"
+                                        .value=${host.desktopLyricSettings.strokeColor.startsWith('#') ? host.desktopLyricSettings.strokeColor : '#000000'}
+                                        @input=${(e: Event) => updateLyricSetting({ strokeColor: (e.target as HTMLInputElement).value })}
+                                      />
+                                      <input
+                                        type="text"
+                                        class="text-xs py-0.5 px-1.5 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] font-mono text-[var(--lx-text)] w-24"
+                                        .value=${host.desktopLyricSettings.strokeColor}
+                                        @change=${(e: Event) => updateLyricSetting({ strokeColor: (e.target as HTMLInputElement).value.trim() })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 pt-1">
+                                  <div class="flex flex-col gap-1">
+                                    <div class="flex justify-between items-center text-xs">
+                                      <span class="font-semibold">阴影模糊大小</span>
+                                      <span class="font-mono text-[var(--lx-accent)] font-bold">${host.desktopLyricSettings.shadowBlur}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="20"
+                                      step="1"
+                                      class="w-full h-1.5 bg-[var(--lx-border)] rounded-lg appearance-none cursor-pointer accent-[var(--lx-accent)]"
+                                      .value=${host.desktopLyricSettings.shadowBlur.toString()}
+                                      @input=${(e: Event) => updateLyricSetting({ shadowBlur: Number((e.target as HTMLInputElement).value) })}
+                                    />
+                                  </div>
+                                  <div class="flex flex-col gap-1">
+                                    <span class="text-[11px] font-semibold opacity-80">文字阴影颜色</span>
+                                    <div class="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        class="w-7 h-7 rounded border border-[var(--lx-border)] cursor-pointer bg-transparent"
+                                        .value=${host.desktopLyricSettings.shadowColor.startsWith('#') ? host.desktopLyricSettings.shadowColor : '#000000'}
+                                        @input=${(e: Event) => updateLyricSetting({ shadowColor: (e.target as HTMLInputElement).value })}
+                                      />
+                                      <input
+                                        type="text"
+                                        class="text-xs py-0.5 px-1.5 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] font-mono text-[var(--lx-text)] w-24"
+                                        .value=${host.desktopLyricSettings.shadowColor}
+                                        @change=${(e: Event) => updateLyricSetting({ shadowColor: (e.target as HTMLInputElement).value.trim() })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--lx-border)]">
+                                  <div class="flex flex-col gap-1">
+                                    <div class="flex justify-between items-center text-xs">
+                                      <span class="font-semibold">悬浮窗边框宽度</span>
+                                      <span class="font-mono text-[var(--lx-accent)] font-bold">${host.desktopLyricSettings.borderWidth}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="5"
+                                      step="1"
+                                      class="w-full h-1.5 bg-[var(--lx-border)] rounded-lg appearance-none cursor-pointer accent-[var(--lx-accent)]"
+                                      .value=${host.desktopLyricSettings.borderWidth.toString()}
+                                      @input=${(e: Event) => updateLyricSetting({ borderWidth: Number((e.target as HTMLInputElement).value) })}
+                                    />
+                                  </div>
+                                  <div class="flex flex-col gap-1">
+                                    <span class="text-[11px] font-semibold opacity-80">悬浮窗边框颜色</span>
+                                    <div class="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        class="w-7 h-7 rounded border border-[var(--lx-border)] cursor-pointer bg-transparent"
+                                        .value=${host.desktopLyricSettings.borderColor.startsWith('#') ? host.desktopLyricSettings.borderColor : '#ffffff'}
+                                        @input=${(e: Event) => updateLyricSetting({ borderColor: (e.target as HTMLInputElement).value })}
+                                      />
+                                      <input
+                                        type="text"
+                                        class="text-xs py-0.5 px-1.5 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] font-mono text-[var(--lx-text)] w-24"
+                                        .value=${host.desktopLyricSettings.borderColor}
+                                        @change=${(e: Event) => updateLyricSetting({ borderColor: (e.target as HTMLInputElement).value.trim() })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div class="flex justify-between items-center pt-1 text-xs">
+                                  <span class="font-semibold">悬浮背景颜色</span>
+                                  <input
+                                    type="text"
+                                    class="text-xs py-1 px-2 rounded bg-[var(--lx-main)] border border-[var(--lx-border)] font-mono text-[var(--lx-text)] w-48 text-right"
+                                    placeholder="rgba(15, 23, 42, 0.45)"
+                                    .value=${host.desktopLyricSettings.backgroundColor}
+                                    @change=${(e: Event) => updateLyricSetting({ backgroundColor: (e.target as HTMLInputElement).value.trim() })}
+                                  />
+                                </div>
+
+                                <div
+                                  class="mt-1 p-3 rounded-lg flex flex-col items-center justify-center text-center transition-all"
+                                  style="background-color: ${host.desktopLyricSettings.backgroundColor}; border: ${host.desktopLyricSettings.borderWidth}px solid ${host.desktopLyricSettings.borderColor};"
+                                >
+                                  <span class="text-[10px] opacity-40 uppercase tracking-wider mb-1">实时效果预览</span>
+                                  <div
+                                    class="font-bold truncate max-w-full"
+                                    style="font-family: ${host.desktopLyricSettings.fontFamily}; font-size: ${Math.min(24, host.desktopLyricSettings.fontSize)}px; color: ${host.desktopLyricSettings.color}; paint-order: stroke fill; -webkit-text-stroke: ${host.desktopLyricSettings.strokeWidth}px ${host.desktopLyricSettings.strokeColor}; filter: drop-shadow(0 2px ${host.desktopLyricSettings.shadowBlur}px ${host.desktopLyricSettings.shadowColor});"
+                                  >
+                                    星之声桌面歌词预览
+                                  </div>
+                                  <div
+                                    class="font-bold truncate max-w-full mt-1.5"
+                                    style="font-family: ${host.desktopLyricSettings.fontFamily}; font-size: ${Math.min(24, host.desktopLyricSettings.fontSize)}px; color: ${host.desktopLyricSettings.color}; paint-order: stroke fill; -webkit-text-stroke: ${host.desktopLyricSettings.strokeWidth}px ${host.desktopLyricSettings.strokeColor}; filter: drop-shadow(0 2px ${host.desktopLyricSettings.shadowBlur}px ${host.desktopLyricSettings.shadowColor});"
+                                  >
+                                    Live preview of desktop lyrics
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           `

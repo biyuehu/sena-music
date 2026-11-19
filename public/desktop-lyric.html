@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>桌面歌词</title>
+  <style>
+    :root {
+      --font-family: system-ui, -apple-system, sans-serif;
+      --font-size: 28px;
+      --text-color: #ffffff;
+      --stroke-width: 2px;
+      --stroke-color: #000000;
+      --shadow-blur: 6px;
+      --shadow-color: rgba(0, 0, 0, 0.85);
+      --bg-color: rgba(15, 23, 42, 0.45);
+      --border-color: rgba(255, 255, 255, 0.15);
+      --border-width: 1px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent !important;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: var(--font-family);
+    }
+
+    .lyric-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 6px 16px;
+      border-radius: 12px;
+      transition: background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+      background-color: transparent;
+      border: var(--border-width) solid transparent;
+      cursor: move;
+    }
+
+    .lyric-wrapper.hovered:not(.locked),
+    .lyric-wrapper:hover:not(.locked) {
+      background-color: var(--bg-color);
+      border-color: var(--border-color);
+      backdrop-filter: blur(8px);
+    }
+
+    .lyric-wrapper.locked {
+      background-color: transparent !important;
+      border-color: transparent !important;
+      backdrop-filter: none !important;
+      cursor: default;
+    }
+
+    .controls-bar {
+      position: absolute;
+      top: 4px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 100;
+    }
+
+    .lyric-wrapper.hovered:not(.locked) .controls-bar,
+    .lyric-wrapper:hover:not(.locked) .controls-bar {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .lyric-wrapper.locked .controls-bar {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .drag-hint {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: move;
+    }
+
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: none;
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      padding: 0;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.35);
+      color: #38bdf8;
+    }
+
+    .ctrl-btn.locked {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+
+    .content-area {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    .lyrics-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .lyric-track {
+      font-size: var(--font-size);
+      font-weight: 700;
+      color: var(--text-color);
+      paint-order: stroke fill;
+      -webkit-text-stroke: var(--stroke-width) var(--stroke-color);
+      filter: drop-shadow(0 2px var(--shadow-blur) var(--shadow-color));
+      transition: color 0.2s ease, font-size 0.15s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      letter-spacing: 0.5px;
+      line-height: 1.25;
+    }
+  </style>
+</head>
+<body>
+  <div id="lyricWrapper" class="lyric-wrapper">
+    <div class="controls-bar">
+      <div class="drag-hint">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><title>音乐</title><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        <span>星之声桌面歌词</span>
+      </div>
+      <div class="action-group">
+        <button id="btnPrev" type="button" class="ctrl-btn" title="上一首">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><title>上一首</title><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button id="btnToggle" type="button" class="ctrl-btn" title="播放 / 暂停">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><title>播放/暂停</title><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button id="btnNext" type="button" class="ctrl-btn" title="下一首">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><title>下一首</title><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+        <button id="btnFontDec" type="button" class="ctrl-btn" title="缩小字体">A-</button>
+        <button id="btnFontInc" type="button" class="ctrl-btn" title="放大字体">A+</button>
+        <button id="btnLock" type="button" class="ctrl-btn" title="锁定歌词（鼠标穿透）">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><title>锁定</title><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        </button>
+        <button id="btnClose" type="button" class="ctrl-btn" title="隐藏桌面歌词">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><title>关闭</title><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="contentArea" class="content-area">
+      <div id="lyricsContainer" class="lyrics-container">
+        <div class="lyric-track">星之声音乐</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      let currentSettings = {
+        fontSize: 28,
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        color: '#ffffff',
+        strokeWidth: 2,
+        strokeColor: '#000000',
+        shadowBlur: 6,
+        shadowColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        locked: false
+      };
+
+      let pendingLock = false;
+
+      const wrapper = document.getElementById('lyricWrapper');
+      const lyricsContainer = document.getElementById('lyricsContainer');
+      const btnPrev = document.getElementById('btnPrev');
+      const btnToggle = document.getElementById('btnToggle');
+      const btnNext = document.getElementById('btnNext');
+      const btnFontDec = document.getElementById('btnFontDec');
+      const btnFontInc = document.getElementById('btnFontInc');
+      const btnLock = document.getElementById('btnLock');
+      const btnClose = document.getElementById('btnClose');
+
+      // Drag window via JS without blocking mouse events
+      let isDragging = false;
+      let startScreenX = 0;
+      let startScreenY = 0;
+
+      wrapper.addEventListener('mousedown', (e) => {
+        if (currentSettings.locked || e.button !== 0) return;
+        if (e.target.closest('button')) return;
+        isDragging = true;
+        startScreenX = e.screenX;
+        startScreenY = e.screenY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.screenX - startScreenX;
+        const dy = e.screenY - startScreenY;
+        startScreenX = e.screenX;
+        startScreenY = e.screenY;
+        if (window.senaDesktop?.moveLyricWindow) {
+          window.senaDesktop.moveLyricWindow(dx, dy);
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      let isResizing = false;
+      let resizeTimer = null;
+      let leaveTimer = null;
+
+      const triggerResizeActive = () => {
+        if (currentSettings.locked) return;
+        isResizing = true;
+        if (leaveTimer) {
+          clearTimeout(leaveTimer);
+          leaveTimer = null;
+        }
+        wrapper.classList.add('hovered');
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          isResizing = false;
+          resizeTimer = null;
+        }, 1200);
+      };
+
+      window.addEventListener('resize', triggerResizeActive);
+
+      const onEnter = () => {
+        if (leaveTimer) {
+          clearTimeout(leaveTimer);
+          leaveTimer = null;
+        }
+        if (!currentSettings.locked && !wrapper.classList.contains('hovered')) {
+          wrapper.classList.add('hovered');
+        }
+      };
+
+      wrapper.addEventListener('mouseenter', onEnter);
+      wrapper.addEventListener('mouseover', onEnter);
+      wrapper.addEventListener('mousemove', onEnter);
+      wrapper.addEventListener('pointerenter', onEnter);
+      wrapper.addEventListener('pointerdown', onEnter);
+      document.body.addEventListener('mousemove', onEnter);
+
+      const onLeave = (e) => {
+        if (isResizing || resizeTimer) return;
+        if (e?.relatedTarget && wrapper.contains(e.relatedTarget)) return;
+        if (pendingLock) {
+          pendingLock = false;
+          currentSettings.locked = true;
+          wrapper.classList.remove('hovered');
+          wrapper.classList.add('locked');
+          btnLock.classList.add('locked');
+          if (window.senaDesktop?.setLyricSettings) {
+            window.senaDesktop.setLyricSettings({ locked: true });
+          }
+          return;
+        }
+        if (leaveTimer) clearTimeout(leaveTimer);
+        leaveTimer = setTimeout(() => {
+          if (!isResizing && !resizeTimer && !currentSettings.locked) {
+            wrapper.classList.remove('hovered');
+          }
+          leaveTimer = null;
+        }, 350);
+      };
+
+      wrapper.addEventListener('mouseleave', onLeave);
+      document.addEventListener('mouseleave', onLeave);
+
+      btnLock.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pendingLock = !pendingLock;
+        if (pendingLock) {
+          btnLock.classList.add('locked');
+          wrapper.classList.add('hovered');
+        } else {
+          btnLock.classList.remove('locked');
+        }
+      });
+
+      function applySettings(s) {
+        if (!s) return;
+        currentSettings = Object.assign({}, currentSettings, s);
+        const docStyle = document.documentElement.style;
+        docStyle.setProperty('--font-family', currentSettings.fontFamily || 'system-ui, -apple-system, sans-serif');
+        docStyle.setProperty('--font-size', `${currentSettings.fontSize || 28}px`);
+        docStyle.setProperty('--text-color', currentSettings.color || '#ffffff');
+        docStyle.setProperty('--stroke-width', `${Number.isFinite(currentSettings.strokeWidth) ? currentSettings.strokeWidth : 2}px`);
+        docStyle.setProperty('--stroke-color', currentSettings.strokeColor || '#000000');
+        docStyle.setProperty('--shadow-blur', `${Number.isFinite(currentSettings.shadowBlur) ? currentSettings.shadowBlur : 6}px`);
+        docStyle.setProperty('--shadow-color', currentSettings.shadowColor || 'rgba(0, 0, 0, 0.85)');
+        docStyle.setProperty('--bg-color', currentSettings.backgroundColor || 'rgba(15, 23, 42, 0.45)');
+        docStyle.setProperty('--border-color', currentSettings.borderColor || 'rgba(255, 255, 255, 0.15)');
+        docStyle.setProperty('--border-width', `${Number.isFinite(currentSettings.borderWidth) ? currentSettings.borderWidth : 1}px`);
+
+        if (!currentSettings.locked) {
+          pendingLock = false;
+          wrapper.classList.remove('locked');
+          btnLock.classList.remove('locked');
+        } else {
+          wrapper.classList.add('locked');
+          wrapper.classList.remove('hovered');
+          btnLock.classList.add('locked');
+        }
+      }
+
+      function updateLyric(data) {
+        if (!data) return;
+        const tracks = Array.isArray(data.tracks) && data.tracks.length > 0
+          ? data.tracks
+          : [data.text || (data.title ? (data.title + (data.artist ? ` - ${data.artist}` : '')) : '星之声音乐')];
+
+        lyricsContainer.innerHTML = '';
+        for (const t of tracks) {
+          if (!t) continue;
+          const el = document.createElement('div');
+          el.className = 'lyric-track';
+          el.textContent = t;
+          lyricsContainer.appendChild(el);
+        }
+        if (lyricsContainer.children.length === 0) {
+          const el = document.createElement('div');
+          el.className = 'lyric-track';
+          el.textContent = '星之声音乐';
+          lyricsContainer.appendChild(el);
+        }
+      }
+
+      function initBridge() {
+        if (!window.senaDesktop) return;
+
+        if (window.senaDesktop.getLyricSettings) {
+          window.senaDesktop.getLyricSettings().then(applySettings).catch(() => {});
+        }
+
+        if (window.senaDesktop.onLyricSettingsUpdate) {
+          window.senaDesktop.onLyricSettingsUpdate(applySettings);
+        }
+
+        if (window.senaDesktop.onLyricUpdate) {
+          window.senaDesktop.onLyricUpdate(updateLyric);
+        }
+
+        if (window.senaDesktop.onLyricResizing) {
+          window.senaDesktop.onLyricResizing(triggerResizeActive);
+        }
+
+        btnPrev.addEventListener('click', () => {
+          if (window.senaDesktop?.sendPlayerCommand) window.senaDesktop.sendPlayerCommand('prev');
+        });
+        btnToggle.addEventListener('click', () => {
+          if (window.senaDesktop?.sendPlayerCommand) window.senaDesktop.sendPlayerCommand('toggle');
+        });
+        btnNext.addEventListener('click', () => {
+          if (window.senaDesktop?.sendPlayerCommand) window.senaDesktop.sendPlayerCommand('next');
+        });
+
+        btnFontDec.addEventListener('click', () => {
+          const nextSize = Math.max(18, (currentSettings.fontSize || 28) - 2);
+          if (window.senaDesktop?.setLyricSettings) {
+            window.senaDesktop.setLyricSettings({ fontSize: nextSize });
+          }
+        });
+
+        btnFontInc.addEventListener('click', () => {
+          const nextSize = Math.min(64, (currentSettings.fontSize || 28) + 2);
+          if (window.senaDesktop?.setLyricSettings) {
+            window.senaDesktop.setLyricSettings({ fontSize: nextSize });
+          }
+        });
+
+        btnClose.addEventListener('click', () => {
+          if (window.senaDesktop?.setLyricSettings) {
+            window.senaDesktop.setLyricSettings({ enabled: false });
+          }
+        });
+      }
+
+      if (window.senaDesktop) {
+        initBridge();
+      } else {
+        window.addEventListener('sena-desktop-ready', initBridge);
+      }
+    })();
+  </script>
+</body>
+</html>

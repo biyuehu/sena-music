@@ -45,6 +45,8 @@ interface PlayerActions {
   setVolume: (volume: number) => void
   openEditModal: (song: SongInfo, e: Event) => void
   toggleFullscreen: () => void
+  toggleDesktopLyric: () => void
+  syncDesktopLyric: (lineIndex?: number) => void
   syncPlaylist: () => void
   openAddSongModal: () => void
   updateSongOrder: (id: string, newIndex: number) => void
@@ -102,7 +104,9 @@ defineComponent(
     visualizer: Ref<AudioVisualizer | null>(null),
     visualizerEnabled: State<boolean>(Storage.get<boolean>('visualizer-enabled').unwrapOr(true)),
     coverColorBgEnabled: State<boolean>(Storage.get<boolean>('cover-color-bg-enabled').unwrapOr(true)),
-    coverColor: State<string | null>(null)
+    coverColor: State<string | null>(null),
+    desktopLyricEnabled: State<boolean>(false),
+    isDesktop: State<boolean>(isDesktopApp())
   },
   {
     useGlobalStyles: true,
@@ -258,6 +262,35 @@ defineComponent(
 
       let isAutoMatchingBili = false
 
+      const syncDesktopLyric = (lineIndex = host.activeLyricIndex): void => {
+        const bridge = getDesktopBridge()
+        if (!bridge?.syncLyric) return
+        const currentSong =
+          host.currentIndex >= 0 && host.currentIndex < host.playlist.length ? host.playlist[host.currentIndex] : null
+        const tracks: string[] = []
+        if (host.lyricStatus === 'pure_music') {
+          tracks.push('纯音乐，请欣赏')
+        } else if (lineIndex >= 0 && host.lyrics[lineIndex]) {
+          const line = host.lyrics[lineIndex]
+          if (host.lyricPref.original && line.original) tracks.push(line.original)
+          if (host.lyricPref.romaji && line.romaji) tracks.push(line.romaji)
+          if (host.lyricPref.translation && line.translation) tracks.push(line.translation)
+          if (tracks.length === 0) {
+            const fallback = line.original || line.translation || line.romaji
+            if (fallback) tracks.push(fallback)
+          }
+        } else if (currentSong) {
+          tracks.push(`${currentSong.name} - ${currentSong.artists.join(' / ')}`)
+        }
+        bridge.syncLyric({
+          tracks,
+          text: tracks[0] || '',
+          isPlaying: host.isPlaying,
+          title: currentSong?.name,
+          artist: currentSong?.artists?.join(' / ')
+        })
+      }
+
       const updateMediaSession = (song?: SongInfo, isPlaying = false): void => {
         if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
           if (song) {
@@ -278,6 +311,7 @@ defineComponent(
             title: song?.name,
             artist: song?.artists?.join(' / ')
           })
+          syncDesktopLyric()
         }
       }
 
@@ -413,15 +447,19 @@ defineComponent(
                     host.activeLyricIndex = findActiveLyricIndex(host.lyrics, checkTime)
                     setTimeout(() => host.actions?.scrollToActiveLyric(false), 60)
                   }
+                  syncDesktopLyric()
                 } else if (lyricRes.status === 'pure_music') {
                   host.lyricStatus = 'pure_music'
+                  syncDesktopLyric()
                 } else {
                   host.lyricStatus = 'no_lyric'
+                  syncDesktopLyric()
                 }
               },
               Left: () => {
                 if (host.playlist[host.currentIndex]?.id === currentSong.id) {
                   host.lyricStatus = 'no_lyric'
+                  syncDesktopLyric()
                 }
               }
             })
@@ -564,6 +602,7 @@ defineComponent(
               host.isUserScrollingLyrics = false
               if (host.lyrics.length > 0) {
                 host.activeLyricIndex = findActiveLyricIndex(host.lyrics, targetTime)
+                syncDesktopLyric(host.activeLyricIndex)
                 setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
               }
             }
@@ -589,6 +628,19 @@ defineComponent(
           } else if (host.visualizer) {
             host.visualizer.setFullscreen(false)
           }
+        },
+        toggleDesktopLyric: (): void => {
+          const bridge = getDesktopBridge()
+          if (!bridge) return
+          bridge.getLyricSettings?.().then((settings) => {
+            const nextEnabled = !settings.enabled
+            bridge.setLyricSettings?.({ enabled: nextEnabled })
+            host.desktopLyricEnabled = nextEnabled
+            if (nextEnabled) syncDesktopLyric()
+          })
+        },
+        syncDesktopLyric: (lineIndex?: number): void => {
+          syncDesktopLyric(lineIndex)
         },
         openEditModal: (song, e): void => {
           e.stopPropagation()
@@ -660,6 +712,7 @@ defineComponent(
           }
           if (host.lyrics.length > 0) {
             host.activeLyricIndex = findActiveLyricIndex(host.lyrics, time)
+            syncDesktopLyric(host.activeLyricIndex)
             setTimeout(() => host.actions?.scrollToActiveLyric(true), 10)
           }
           if (autoPlay && !host.isPlaying) {
@@ -761,6 +814,47 @@ defineComponent(
         }
       }
 
+      let lyricRafId: number | null = null
+
+      const checkActiveLyric = (): void => {
+        if (host.lyrics.length > 0 && !audio.paused) {
+          const newIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
+          if (newIndex !== host.activeLyricIndex) {
+            host.activeLyricIndex = newIndex
+            syncDesktopLyric(newIndex)
+            if (!host.isUserScrollingLyrics && newIndex >= 0) {
+              host.actions?.scrollToActiveLyric()
+            }
+          }
+        }
+        if (host.isPlaying && !audio.paused) {
+          lyricRafId = requestAnimationFrame(checkActiveLyric)
+        } else {
+          lyricRafId = null
+        }
+      }
+
+      const startLyricTracking = (): void => {
+        if (lyricRafId === null && !audio.paused) {
+          lyricRafId = requestAnimationFrame(checkActiveLyric)
+        }
+      }
+
+      const stopLyricTracking = (): void => {
+        if (lyricRafId !== null) {
+          cancelAnimationFrame(lyricRafId)
+          lyricRafId = null
+        }
+      }
+
+      audio.onplay = (): void => {
+        startLyricTracking()
+      }
+
+      audio.onseeked = (): void => {
+        checkActiveLyric()
+      }
+
       audio.ontimeupdate = (): void => {
         if (!host.isDragging && !Number.isNaN(audio.duration)) {
           host.progress = (audio.currentTime / audio.duration) * 100 || 0
@@ -769,18 +863,10 @@ defineComponent(
           savePlaybackProgress(audio.currentTime)
           syncMediaPosition()
         }
-
-        if (host.lyrics.length > 0) {
-          const newIndex = findActiveLyricIndex(host.lyrics, audio.currentTime)
-          if (newIndex !== host.activeLyricIndex) {
-            host.activeLyricIndex = newIndex
-            if (!host.isUserScrollingLyrics && newIndex >= 0) {
-              host.actions?.scrollToActiveLyric()
-            }
-          }
-        }
+        checkActiveLyric()
       }
       audio.onpause = (): void => {
+        stopLyricTracking()
         if (host.visualizer) host.visualizer.setPlaying(false)
         if (!Number.isNaN(audio.currentTime) && audio.currentTime > 0) {
           savePlaybackTime(audio.currentTime)
@@ -788,6 +874,7 @@ defineComponent(
         updateMediaSession(host.playlist[host.currentIndex], false)
       }
       audio.onended = (): void => {
+        stopLyricTracking()
         savePlaybackTime(0)
         const currentSong = host.playlist[host.currentIndex]
         if (
@@ -1068,6 +1155,7 @@ defineComponent(
       }
 
       let unsubscribeDesktop: (() => void) | undefined
+      let unsubscribeLyricSettings: (() => void) | undefined
       const setupDesktopBridge = (): void => {
         const desktopBridge = getDesktopBridge()
         if (desktopBridge && !unsubscribeDesktop) {
@@ -1090,6 +1178,14 @@ defineComponent(
                 break
             }
           })
+          desktopBridge.getLyricSettings?.().then((settings) => {
+            host.desktopLyricEnabled = settings.enabled
+          })
+          if (!unsubscribeLyricSettings && desktopBridge.onLyricSettingsUpdate) {
+            unsubscribeLyricSettings = desktopBridge.onLyricSettingsUpdate((settings) => {
+              host.desktopLyricEnabled = settings.enabled
+            })
+          }
           const current = host.playlist[host.currentIndex]
           if (current) {
             desktopBridge.syncPlaybackState({
@@ -1097,6 +1193,7 @@ defineComponent(
               title: current.name,
               artist: current.artists?.join(' / ')
             })
+            syncDesktopLyric()
           }
         }
       }
@@ -1120,6 +1217,7 @@ defineComponent(
       return (): void => {
         window.removeEventListener('sena-desktop-ready', handleDesktopReady)
         if (unsubscribeDesktop) unsubscribeDesktop()
+        if (unsubscribeLyricSettings) unsubscribeLyricSettings()
         document.removeEventListener('visualizer-toggle', handleVisualizerToggle)
         document.removeEventListener('cover-color-bg-toggle', handleCoverColorBgToggle)
         if (host.visualizer) {
@@ -1319,6 +1417,21 @@ defineComponent(
             </div>
           </div>
 
+          ${
+            host.isDesktop
+              ? html`
+            <div
+              class="hidden md:flex items-center justify-center w-6 h-6 rounded text-xs select-none cursor-pointer transition-all ${
+                host.desktopLyricEnabled
+                  ? 'text-[var(--lx-accent)] font-bold'
+                  : 'text-[var(--lx-text-muted)] opacity-50 hover:opacity-100 hover:text-[var(--lx-text)]'
+              }"
+              title="${host.desktopLyricEnabled ? '关闭桌面歌词' : '开启桌面歌词'}"
+              @click=${() => host.actions?.toggleDesktopLyric()}
+            >词</div>
+          `
+              : ''
+          }
           ${!isFull ? html`<div class="hidden md:block i-carbon-maximize opacity-40 hover:opacity-100 cursor-pointer text-lg" title="全屏歌词 (F)" @click=${() => host.actions?.toggleFullscreen()}></div>` : ''}
         </div>
       </div>
@@ -1339,12 +1452,29 @@ defineComponent(
         const nextPref = { ...host.lyricPref, [track]: !host.lyricPref[track] }
         host.lyricPref = nextPref
         saveStoredLyricPreference(nextPref)
+        host.actions?.syncDesktopLyric()
       }
 
       const renderLyricToolbar = () => {
-        if (!hasTranslation && !hasRomaji) return ''
+        if (!hasTranslation && !hasRomaji && !host.isDesktop) return ''
         return html`
           <div class="flex items-center gap-1.5 select-none">
+            ${
+              host.isDesktop
+                ? html`
+              <button
+                class="px-2.5 py-0.5 text-xs rounded-full border transition-all cursor-pointer ${
+                  host.desktopLyricEnabled
+                    ? 'bg-[var(--lx-accent)] text-zinc-900 dark:text-zinc-950 border-[var(--lx-accent)] font-bold shadow-sm'
+                    : 'bg-transparent border-[var(--lx-border)] text-[var(--lx-text-muted)] opacity-70 hover:opacity-100 hover:text-[var(--lx-text)]'
+                }"
+                @click=${() => host.actions?.toggleDesktopLyric()}
+                title="${host.desktopLyricEnabled ? '关闭桌面歌词' : '开启桌面歌词'}"
+              >
+                词
+              </button>`
+                : ''
+            }
             ${
               hasTranslation
                 ? html`
@@ -1424,6 +1554,8 @@ defineComponent(
                     data-lyric-index="${index}"
                     @click=${(e: Event) => {
                       e.stopPropagation()
+                      host.activeLyricIndex = index
+                      host.actions?.syncDesktopLyric(index)
                       host.actions?.seekToTime(line.time)
                     }}
                     class="cursor-pointer transition-all duration-300 transform group ${
