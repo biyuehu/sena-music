@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron'
 import { APP_ICON_DATA_URL, TRAY_ICON_DATA_URL } from './assets'
 import {
   checkShortcutConflict,
@@ -41,6 +41,7 @@ export interface DesktopLyricSettings {
   backgroundColor: string
   borderColor: string
   borderWidth: number
+  opacity: number
   width: number
   height: number
   x?: number
@@ -61,6 +62,7 @@ const DEFAULT_LYRIC_SETTINGS: DesktopLyricSettings = {
   backgroundColor: 'rgba(15, 23, 42, 0.45)',
   borderColor: 'rgba(255, 255, 255, 0.15)',
   borderWidth: 1,
+  opacity: 1,
   width: 800,
   height: 130
 }
@@ -350,19 +352,28 @@ function setupIpcHandlers(userData: string): void {
   ipcMain.on('desktop:move-lyric-window', (_event, { dx, dy }: { dx: number; dy: number }) => {
     if (lyricWindow && !lyricWindow.isDestroyed()) {
       isMovingLyricWindow = true
-      if (moveLyricTimer) clearTimeout(moveLyricTimer)
-      moveLyricTimer = setTimeout(() => {
-        isMovingLyricWindow = false
-      }, 250)
       const [x, y] = lyricWindow.getPosition()
       const width = currentLyricSettings.width || 800
       const height = currentLyricSettings.height || 130
+      const nx = Math.round(x + dx)
+      const ny = Math.round(y + dy)
       lyricWindow.setBounds({
-        x: Math.round(x + dx),
-        y: Math.round(y + dy),
+        x: nx,
+        y: ny,
         width,
         height
       })
+      currentLyricSettings = { ...currentLyricSettings, x: nx, y: ny }
+
+      if (moveLyricTimer) clearTimeout(moveLyricTimer)
+      moveLyricTimer = setTimeout(() => {
+        isMovingLyricWindow = false
+        if (lyricWindow && !lyricWindow.isDestroyed()) {
+          const [finalX, finalY] = lyricWindow.getPosition()
+          currentLyricSettings = { ...currentLyricSettings, x: finalX, y: finalY }
+          saveDesktopSettings(app.getPath('userData'), { closeAction, lyric: currentLyricSettings })
+        }
+      }, 250)
     }
   })
 }
@@ -372,11 +383,25 @@ function createLyricWindow(preloadPath: string, port: number): void {
 
   const { width = 800, height = 130, x, y, locked = false } = currentLyricSettings
 
+  let validX = x
+  let validY = y
+  if (typeof x === 'number' && typeof y === 'number') {
+    const displays = screen.getAllDisplays()
+    const isVisibleOnAnyDisplay = displays.some((d) => {
+      const b = d.bounds
+      return x >= b.x - width + 50 && x <= b.x + b.width - 50 && y >= b.y && y <= b.y + b.height - 30
+    })
+    if (!isVisibleOnAnyDisplay) {
+      validX = void 0
+      validY = void 0
+    }
+  }
+
   lyricWindow = new BrowserWindow({
     width,
     height,
-    x,
-    y,
+    x: validX,
+    y: validY,
     minWidth: 400,
     minHeight: 80,
     frame: false,
@@ -457,10 +482,16 @@ function createLyricWindow(preloadPath: string, port: number): void {
 
   if (currentLyricSettings.enabled) {
     lyricWindow.once('ready-to-show', () => {
-      lyricWindow?.showInactive()
-      lyricWindow?.setAlwaysOnTop(true, 'screen-saver', 1)
-      lyricWindow?.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-      lyricWindow?.moveTop()
+      if (!lyricWindow || lyricWindow.isDestroyed()) return
+      const [curX, curY] = lyricWindow.getPosition()
+      if (currentLyricSettings.x !== curX || currentLyricSettings.y !== curY) {
+        currentLyricSettings = { ...currentLyricSettings, x: curX, y: curY }
+        saveDesktopSettings(app.getPath('userData'), { closeAction, lyric: currentLyricSettings })
+      }
+      lyricWindow.showInactive()
+      lyricWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+      lyricWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+      lyricWindow.moveTop()
     })
   }
 }
@@ -652,7 +683,13 @@ if (app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     isQuitting = true
-    if (lyricWindow && !lyricWindow.isDestroyed()) lyricWindow.destroy()
+    if (lyricWindow && !lyricWindow.isDestroyed()) {
+      const [finalX, finalY] = lyricWindow.getPosition()
+      const [finalW, finalH] = lyricWindow.getSize()
+      currentLyricSettings = { ...currentLyricSettings, x: finalX, y: finalY, width: finalW, height: finalH }
+      saveDesktopSettings(app.getPath('userData'), { closeAction, lyric: currentLyricSettings })
+      lyricWindow.destroy()
+    }
   })
 
   app.on('will-quit', () => {

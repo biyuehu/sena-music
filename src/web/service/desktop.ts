@@ -22,6 +22,7 @@ export interface DesktopLyricSettings {
   backgroundColor: string
   borderColor: string
   borderWidth: number
+  opacity: number
   width: number
   height: number
   x?: number
@@ -42,6 +43,7 @@ export const DEFAULT_DESKTOP_LYRIC_SETTINGS: DesktopLyricSettings = {
   backgroundColor: 'rgba(15, 23, 42, 0.45)',
   borderColor: 'rgba(255, 255, 255, 0.15)',
   borderWidth: 1,
+  opacity: 1,
   width: 800,
   height: 130
 }

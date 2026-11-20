@@ -797,6 +797,22 @@ defineComponent(
                                   />
                                 </div>
 
+                                <div class="flex flex-col gap-1.5 pt-1">
+                                  <div class="flex justify-between items-center text-xs">
+                                    <span class="font-semibold">歌词不透明度</span>
+                                    <span class="font-mono text-[var(--lx-accent)] font-bold">${Math.round((host.desktopLyricSettings.opacity ?? 1) * 100)}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0.1"
+                                    max="1"
+                                    step="0.05"
+                                    class="w-full h-1.5 bg-[var(--lx-border)] rounded-lg appearance-none cursor-pointer accent-[var(--lx-accent)]"
+                                    .value=${(host.desktopLyricSettings.opacity ?? 1).toString()}
+                                    @input=${(e: Event) => updateLyricSetting({ opacity: Number((e.target as HTMLInputElement).value) })}
+                                  />
+                                </div>
+
                                 <div class="flex flex-col gap-1 pt-1">
                                   <span class="text-[11px] font-semibold opacity-80">歌词文字颜色</span>
                                   <div class="flex items-center gap-2">
@@ -928,7 +944,7 @@ defineComponent(
 
                                 <div
                                   class="mt-1 p-3 rounded-lg flex flex-col items-center justify-center text-center transition-all"
-                                  style="background-color: ${host.desktopLyricSettings.backgroundColor}; border: ${host.desktopLyricSettings.borderWidth}px solid ${host.desktopLyricSettings.borderColor};"
+                                  style="background-color: ${host.desktopLyricSettings.backgroundColor}; border: ${host.desktopLyricSettings.borderWidth}px solid ${host.desktopLyricSettings.borderColor}; opacity: ${host.desktopLyricSettings.opacity ?? 1};"
                                 >
                                   <span class="text-[10px] opacity-40 uppercase tracking-wider mb-1">实时效果预览</span>
                                   <div

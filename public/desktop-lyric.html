@@ -16,6 +16,7 @@
       --bg-color: rgba(15, 23, 42, 0.45);
       --border-color: rgba(255, 255, 255, 0.15);
       --border-width: 1px;
+      --opacity: 1;
     }
 
     * {
@@ -44,10 +45,11 @@
       align-items: center;
       padding: 6px 16px;
       border-radius: 12px;
-      transition: background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+      transition: background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease, opacity 0.25s ease;
       background-color: transparent;
       border: var(--border-width) solid transparent;
       cursor: move;
+      opacity: var(--opacity);
     }
 
     .lyric-wrapper.hovered:not(.locked),
@@ -55,6 +57,7 @@
       background-color: var(--bg-color);
       border-color: var(--border-color);
       backdrop-filter: blur(8px);
+      opacity: 1;
     }
 
     .lyric-wrapper.locked {
@@ -214,6 +217,7 @@
         backgroundColor: 'rgba(15, 23, 42, 0.45)',
         borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
+        opacity: 1,
         locked: false
       };
 
@@ -346,6 +350,7 @@
         docStyle.setProperty('--bg-color', currentSettings.backgroundColor || 'rgba(15, 23, 42, 0.45)');
         docStyle.setProperty('--border-color', currentSettings.borderColor || 'rgba(255, 255, 255, 0.15)');
         docStyle.setProperty('--border-width', `${Number.isFinite(currentSettings.borderWidth) ? currentSettings.borderWidth : 1}px`);
+        docStyle.setProperty('--opacity', `${Number.isFinite(currentSettings.opacity) ? currentSettings.opacity : 1}`);
 
         if (!currentSettings.locked) {
           pendingLock = false;
